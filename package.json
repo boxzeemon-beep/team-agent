@@ -1,0 +1,30 @@
+{
+  "name": "team-agent-alpha",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "coordinator": "tsx apps/coordinator/src/index.ts",
+    "coordinator:built": "node apps/coordinator/dist/server/index.js",
+    "coordinator:dev": "pnpm --filter @team-agent/coordinator dev",
+    "runner": "tsx apps/runner/src/cli.ts",
+    "runner:built": "node apps/runner/dist/cli.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.2",
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

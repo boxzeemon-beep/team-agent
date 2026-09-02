@@ -1,0 +1,22 @@
+{
+  "name": "@team-agent/runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsup src/cli.ts --format esm --platform node --target node22 --out-dir dist --clean",
+    "start": "tsx src/cli.ts",
+    "start:built": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@team-agent/shared": "workspace:*",
+    "ws": "^8.18.3",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
+  }
+}
