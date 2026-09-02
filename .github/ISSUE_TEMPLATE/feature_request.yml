@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a focused improvement for Team Agent.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is difficult today, and who experiences it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful change and its user-visible result.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workarounds
+      description: How is the problem handled today?
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add mockups, example workflows, or links that make the request concrete.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and discussions for this request.
+          required: true

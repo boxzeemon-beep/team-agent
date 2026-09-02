@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <title>Team Agent — share coding agents across your team</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f6f1"/>
+      <stop offset="1" stop-color="#e6eee9"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#244437" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="1130" cy="90" r="210" fill="#dbe8df"/>
+  <circle cx="90" cy="620" r="260" fill="#f2dfcf"/>
+  <g transform="translate(96 112)">
+    <rect width="104" height="104" rx="28" fill="#335d4b" filter="url(#shadow)"/>
+    <path d="M28 32h30a13 13 0 0 1 13 13v5" fill="none" stroke="#fffefa" stroke-width="8" stroke-linecap="round"/>
+    <path d="m62 41 11 11-11 11" fill="none" stroke="#fffefa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="31" cy="75" r="9" fill="#f0a76f"/>
+    <circle cx="73" cy="75" r="9" fill="#fffefa"/>
+    <path d="M40 75h24" stroke="#fffefa" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="232" y="183" fill="#24241f" font-family="Inter,Arial,sans-serif" font-size="62" font-weight="750">Team Agent</text>
+  <text x="96" y="320" fill="#24241f" font-family="Inter,Arial,sans-serif" font-size="48" font-weight="720">Share coding agents across your team.</text>
+  <text x="96" y="388" fill="#335d4b" font-family="Inter,Arial,sans-serif" font-size="46" font-weight="720">Keep credentials with their owners.</text>
+  <g transform="translate(96 476)">
+    <rect width="430" height="76" rx="18" fill="#24241f"/>
+    <text x="28" y="49" fill="#fffefa" font-family="SFMono-Regular,Consolas,monospace" font-size="27">docker compose up -d</text>
+  </g>
+  <text x="566" y="526" fill="#716f66" font-family="Inter,Arial,sans-serif" font-size="25">Local-first  ·  Auditable  ·  Open source</text>
+</svg>

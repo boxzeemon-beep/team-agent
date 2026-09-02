@@ -34,6 +34,13 @@ export interface CliOptions {
   resetManaged?: string;
 }
 
+export interface DoctorOptions {
+  coordinator?: string;
+  dataDir: string;
+}
+
+export const defaultRunnerDataDir = join(homedir(), ".team-agent", "runner");
+
 export function parseCliOptions(argv: string[]): CliOptions {
   const values = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {
@@ -58,10 +65,39 @@ export function parseCliOptions(argv: string[]): CliOptions {
     coordinator,
     ...(pair ? { pair } : {}),
     name: values.get("name") ?? "My Codex",
-    dataDir:
-      values.get("data-dir") ?? join(homedir(), ".team-agent-alpha", "runner"),
+    dataDir: values.get("data-dir") ?? defaultRunnerDataDir,
     ...(resetManaged ? { resetManaged } : {}),
   };
+}
+
+export function parseDoctorOptions(argv: string[]): DoctorOptions {
+  const values = parseNamedValues(argv, new Set(["coordinator", "data-dir"]));
+  const coordinator = values.get("coordinator");
+  if (coordinator) new URL(coordinator);
+  return {
+    ...(coordinator ? { coordinator } : {}),
+    dataDir: values.get("data-dir") ?? defaultRunnerDataDir,
+  };
+}
+
+function parseNamedValues(
+  argv: string[],
+  allowed: ReadonlySet<string>,
+): Map<string, string> {
+  const values = new Map<string, string>();
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (!argument?.startsWith("--"))
+      throw new Error(`Unexpected argument: ${argument ?? ""}`);
+    const name = argument.slice(2);
+    if (!allowed.has(name)) throw new Error(`Unknown option: ${argument}`);
+    const value = argv[index + 1];
+    if (!value || value.startsWith("--"))
+      throw new Error(`Missing value for ${argument}`);
+    values.set(name, value);
+    index += 1;
+  }
+  return values;
 }
 
 export class StateStore {

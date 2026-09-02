@@ -2,7 +2,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { StateStore } from "./config.js";
+import {
+  defaultRunnerDataDir,
+  parseCliOptions,
+  parseDoctorOptions,
+  StateStore,
+} from "./config.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -27,5 +32,29 @@ describe("runner process lock", () => {
     await first.releaseProcessLock();
     await second.acquireProcessLock();
     await second.releaseProcessLock();
+  });
+});
+
+describe("Runner CLI options", () => {
+  it("uses the public Team Agent data directory", () => {
+    expect(
+      parseCliOptions(["--coordinator", "http://localhost:4310"]).dataDir,
+    ).toBe(defaultRunnerDataDir);
+    expect(defaultRunnerDataDir).toContain(".team-agent/runner");
+    expect(defaultRunnerDataDir).not.toContain("alpha");
+  });
+
+  it("accepts optional doctor settings", () => {
+    expect(
+      parseDoctorOptions([
+        "--coordinator",
+        "https://team-agent.example",
+        "--data-dir",
+        "/tmp/runner",
+      ]),
+    ).toEqual({
+      coordinator: "https://team-agent.example",
+      dataDir: "/tmp/runner",
+    });
   });
 });

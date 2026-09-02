@@ -1,20 +1,45 @@
 {
   "name": "@team-agent/runner",
   "version": "0.1.0",
-  "private": true,
+  "description": "Share a local Codex agent with a Team Agent coordinator",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boxzeemon-beep/team-agent.git",
+    "directory": "apps/runner"
+  },
+  "homepage": "https://github.com/boxzeemon-beep/team-agent#readme",
+  "keywords": [
+    "codex",
+    "coding-agent",
+    "team-agent",
+    "runner"
+  ],
   "type": "module",
+  "bin": {
+    "team-agent": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsup src/cli.ts --format esm --platform node --target node22 --out-dir dist --clean",
+    "build": "tsup --config tsup.config.ts",
     "start": "tsx src/cli.ts",
     "start:built": "node dist/cli.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@team-agent/shared": "workspace:*",
     "ws": "^8.18.3",
     "zod": "^4.1.5"
   },
   "devDependencies": {
+    "@team-agent/shared": "workspace:*",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"

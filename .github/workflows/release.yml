@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Assemble deployable packages
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          package_version="$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")"
+          coordinator_version="$(node -p "JSON.parse(require('node:fs').readFileSync('apps/coordinator/package.json', 'utf8')).version")"
+          runner_version="$(node -p "JSON.parse(require('node:fs').readFileSync('apps/runner/package.json', 'utf8')).version")"
+          test "${VERSION}" = "v${package_version}"
+          test "${VERSION}" = "v${coordinator_version}"
+          test "${VERSION}" = "v${runner_version}"
+
+          mkdir -p release/stage
+          pnpm --filter @team-agent/coordinator deploy --prod --legacy "${GITHUB_WORKSPACE}/release/stage/coordinator"
+          pnpm --filter @team-agent/runner deploy --prod --legacy "${GITHUB_WORKSPACE}/release/stage/runner"
+
+          pnpm --filter @team-agent/runner pack --pack-destination "${GITHUB_WORKSPACE}/release"
+          runner_package="$(find release -maxdepth 1 -name 'team-agent-runner-*.tgz' -print -quit)"
+          test -n "${runner_package}"
+          mv "${runner_package}" release/team-agent-runner.tgz
+
+          cp LICENSE README.md release/stage/coordinator/
+          cp LICENSE README.md release/stage/runner/
+
+          tar -C release/stage/coordinator -czf "release/team-agent-coordinator-linux-x64-${VERSION}.tar.gz" .
+          tar -C release/stage/runner -czf "release/team-agent-runner-linux-x64-${VERSION}.tar.gz" .
+
+          cd release
+          sha256sum team-agent-*.tar.gz team-agent-runner.tgz > SHA256SUMS
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate container metadata
+        id: container-metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Publish Coordinator container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.container-metadata.outputs.tags }}
+          labels: ${{ steps.container-metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --generate-notes \
+            --title "Team Agent ${GITHUB_REF_NAME}" \
+            release/team-agent-*.tar.gz \
+            release/team-agent-runner.tgz \
+            release/SHA256SUMS

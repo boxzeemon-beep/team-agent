@@ -92,7 +92,7 @@ function ClaimView({
     <main className="auth-shell">
       <section className="auth-card">
         <div className="brand-mark">TA</div>
-        <p className="eyebrow">TEAM AGENT · INTERNAL ALPHA</p>
+        <p className="eyebrow">TEAM AGENT · SHARED CODING AGENTS</p>
         <h1>{token ? "加入团队项目" : "这是一个内部工作台"}</h1>
         <p className="muted auth-copy">
           {token
@@ -635,9 +635,7 @@ function PairModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="step">
             <span>2</span>
-            <p>
-              在该电脑的 Team Agent Alpha 源码根目录运行下面的单次配对命令：
-            </p>
+            <p>在贡献 Agent 的电脑上运行下面的单次配对命令：</p>
           </div>
           <div className="command-box">
             <code>{pairing.command}</code>
@@ -947,7 +945,7 @@ function Dashboard({
           <div className="brand-mark small-mark">TA</div>
           <div>
             <strong>{snapshot.settings.projectName}</strong>
-            <span>Team Agent · 内部内测</span>
+            <span>团队 Coding Agent 共享工作台</span>
           </div>
         </div>
         <div className="header-right">
@@ -1161,7 +1159,7 @@ function Dashboard({
         </section>
       </main>
       <footer>
-        <span>Team Agent Internal Alpha</span>
+        <span>Team Agent · Local-first and credential-safe</span>
         <span>仓库：{snapshot.settings.repositoryUrl || "尚未配置"}</span>
       </footer>
       {pairOpen && <PairModal onClose={() => setPairOpen(false)} />}

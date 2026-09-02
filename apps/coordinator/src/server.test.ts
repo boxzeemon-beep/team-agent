@@ -256,6 +256,37 @@ afterEach(async () => {
 });
 
 describe("coordinator", () => {
+  it("exposes an unauthenticated health check", async () => {
+    const runtime = await startRuntime();
+    const response = await runtime.app.inject({
+      method: "GET",
+      url: "/api/health",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: "ok",
+      service: "team-agent-coordinator",
+      version: "0.1.0",
+    });
+  });
+
+  it("returns a one-command Runner pairing flow from the public release", async () => {
+    const runtime = await startRuntime();
+    const { cookie } = await claimBootstrap(runtime, "Alice");
+    const response = await runtime.app.inject({
+      method: "POST",
+      url: "/api/agents/pair",
+      headers: { cookie },
+      payload: { displayName: "Alice's Codex" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().command).toContain(
+      "releases/latest/download/team-agent-runner.tgz",
+    );
+    expect(response.json().command).toContain("team-agent runner");
+    expect(response.json().command).toContain("Alice's Codex");
+  });
+
   it("serves nested web assets and uses the SPA fallback only outside the API", async () => {
     const directory = mkdtempSync(join(tmpdir(), "team-agent-static-"));
     temporaryDirectories.push(directory);

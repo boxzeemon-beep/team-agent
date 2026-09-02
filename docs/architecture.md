@@ -1,57 +1,98 @@
-# Team Agent Alpha 架构
+# Architecture
 
-## 边界
+Team Agent is a TypeScript monorepo with two long-running processes, one shared protocol package, a SQLite database, and a shared Git working branch.
 
-系统由一个协调进程、若干本地 Runner、一个 SQLite 文件和一个共享 Git 分支组成。协调进程只监听本机回环地址，再由 Tailscale Serve 暴露到团队 tailnet。
+## Components
 
-```text
-成员浏览器 ── HTTPS/SSE ──> Tailscale Serve ──> Coordinator
-                                                    │
-                                                    ├── SQLite
-                                                    └── WebSocket
-                                                         │
-                                    ┌────────────────────┼────────────────────┐
-                                    ▼                    ▼                    ▼
-                              张三的 Runner         李四的 Runner         王五的 Runner
-                              Codex + Git           Codex + Git           Codex + Git
+```mermaid
+flowchart LR
+    B[Member browsers] -->|HTTPS + SSE| T[Tailscale Serve or reverse proxy]
+    T --> C[Coordinator]
+    C --> DB[(SQLite)]
+    C <-->|WebSocket| RA[Runner A]
+    C <-->|WebSocket| RB[Runner B]
+    RA --> CA[Local Codex app-server]
+    RB --> CB[Local Codex app-server]
+    RA --> GA[Managed Git clone]
+    RB --> GB[Managed Git clone]
+    GA --> R[(Shared remote branch)]
+    GB --> R
 ```
 
-## 一致性模型
+### Coordinator
 
-1. SQLite 是成员、Agent、任务队列和项目消息的事实来源。
-2. `internal-alpha` 是代码状态的事实来源。
-3. Coordinator 在 SQLite 中抢占唯一活动任务；`running` 和 `waiting_for_owner` 都持有全项目执行锁。
-4. 调度器按创建时间选择最早可执行任务，跳过目标 Agent 暂时离线或暂停的任务。
-5. Runner 每次执行前同步共享分支，完成后测试、提交并推送，然后再报告完成。
-6. 每个 Agent 保存自己的 Codex Thread ID；Coordinator 按该 Agent 的上下文游标发送增量项目消息。
+The Coordinator owns invitations, browser sessions, project settings, shared conversation history, the task queue, the project-wide execution lock, the web/API surfaces, and durable SQLite state. It has no Codex login or Git credential. It defaults to `127.0.0.1:4310` and relies on a private HTTPS route such as Tailscale Serve for team access.
 
-## 信任边界
+### Runner
 
-- 浏览器会话、邀请和 Runner 配对凭据只在服务端保存 SHA-256 摘要。
-- 会话 Cookie 使用 `HttpOnly` 与 `SameSite=Strict`；经 HTTPS 公开地址运行时同时使用 `Secure`。
-- Coordinator 不接收成员的 Codex 登录凭据或 Git 凭据。
-- Runner 使用所在电脑已有的 Codex 登录和 Git 凭据，受管副本位于 Runner 数据目录。
-- Tailscale ACL 决定哪些设备可到达 Coordinator；应用内邀请决定谁可进入项目。
+Each Agent owner runs a Runner on their own computer. It owns a persistent device token and Agent identity, a local Codex thread per project, a managed Git clone, test/commit/push execution, and a bounded cache of completion receipts. The Runner connects outbound to the Coordinator and uses the owner's existing local Codex and Git sessions.
 
-## 故障恢复
+### Shared protocol
 
-- `running` 与 `waiting_for_owner` 是 SQLite 中的持久全局锁。Runner 断线或 Coordinator 重启只把 Agent 标记为离线；活动任务保持原状态，重连后收到数据库保存的同一份 assignment。
-- Runner 将设备 ID、Runner token、Agent ID、项目 Thread ID 和已完成任务回执写入本地状态文件。
-- Runner 重连时携带活动任务 ID；重复分配同一已完成任务时复用保存的回执，减少重复提交。
-- 测试或 Git 操作异常进入 `needs_attention`，保留诊断 diff、本地 task commit 和测试输出，同时暂停该 Agent，避免它在受管工作区处理完毕前接收新任务；后续由所有者处置后重试或显式重置。
-- 离线活动任务默认继续持锁。紧急释放是管理员专用的运维动作，仅在目标 Agent 已离线且任务仍为 `running` 或 `waiting_for_owner` 时生效。一次 SQLite 事务会把任务置为 `needs_attention`、保留 assignment、暂停 Agent 并写入系统消息；事务完成后调度器才选择下一个任务。
-- 紧急释放前要从操作层面确认所有者电脑上的 Runner 已停止。暂停 Agent 可阻止其重连后继续接收任务，所有者检查受管 Git 副本后再恢复共享。
+`packages/shared` defines the HTTP payloads and Runner protocol used by the Coordinator, web app, and Runner. Runner messages cover registration, heartbeat, assignment, progress, owner-waiting, completion, and attention-needed events.
 
-## 运维约定
+## Consistency model
 
-- Coordinator 每次启动都使用同一绝对 `TEAM_AGENT_DATA_DIR`；Runner 使用自定义 `--data-dir` 后，每次启动与重置也沿用同一路径。
-- 源码入口是根目录的 `pnpm coordinator` / `pnpm runner`，构建入口是 `pnpm coordinator:built` / `pnpm runner:built`。
-- SQLite 备份在 Coordinator 停止后进行，整体复制数据目录，以同时保存数据库、WAL/SHM 和持久密钥。
+1. SQLite is the source of truth for members, Agents, settings, tasks, messages, and the active assignment.
+2. The configured shared Git branch is the source of truth for code state.
+3. A task in `running` or `waiting_for_owner` holds the durable project-wide execution lock.
+4. The scheduler chooses the earliest runnable task and skips work targeted at an offline or paused Agent.
+5. Before work, a Runner fetches and resets its managed clone to the latest shared branch state.
+6. After work, it runs the configured tests, commits, pushes, and only then reports completion.
+7. Every Agent has a context cursor. An assignment contains shared project messages added since that Agent last participated, plus the current task conversation and preceding results.
 
-## 明确留到后续的能力
+The current release intentionally serializes all code tasks for its single project. This avoids merge races while a team uses the shared-Agent workflow.
 
-- 自动 Agent 路由
-- 并行分支与多项目
-- 微信群直接 @
-- 其他 Agent 类型
-- 云端消息队列、对象存储和托管部署
+## Task lifecycle
+
+```text
+queued
+  ├── selected Agent unavailable → waiting_for_agent
+  └── assignment dispatched       → running
+                                      ├── local approval → waiting_for_owner
+                                      ├── success        → completed
+                                      └── test/Git issue → needs_attention
+
+queued or waiting tasks may also be reassigned or canceled.
+```
+
+An offline waiting task keeps its selected Agent but does not block runnable tasks for online Agents. An active task whose Runner disconnects keeps the lock and its assignment so the same Runner can resume safely.
+
+## Recovery model
+
+### Coordinator restart
+
+Members, sessions, settings, tasks, messages, Agent context cursors, and the active lock are persisted in SQLite. Starting with the same `TEAM_AGENT_DATA_DIR` reconstructs the queue. A reconnecting Runner receives the saved assignment.
+
+### Runner restart
+
+The Runner persists its device ID, device token, Agent ID, project thread IDs, last task IDs, and recent completion receipts. It also protects its data directory with a process lock. Starting with the same data directory restores its identity and managed clones.
+
+### Test or Git failure
+
+The task enters `needs_attention`, diagnostic output and local work are preserved, and the Agent is paused. The owner can inspect the managed clone, retry after resolving the issue, or explicitly reset a managed project with `--reset-managed PROJECT_KEY`.
+
+### Disconnected active Runner
+
+The default is to retain the lock. An administrator-only emergency release is available after the team has confirmed that the owner's Runner process has stopped. It moves the task to `needs_attention`, preserves its assignment, pauses the Agent, records a system message, and then allows the scheduler to continue.
+
+## Persistence and backup
+
+- Coordinator data defaults to `.data/coordinator`; use a stable absolute `TEAM_AGENT_DATA_DIR` for a persistent deployment.
+- SQLite uses WAL mode, so a consistent backup requires stopping the Coordinator and copying the entire data directory, including database, WAL, SHM, and persisted server keys.
+- A custom Runner `--data-dir` must be reused for every start and reset command.
+- Do not run two Runner processes against the same data directory.
+
+## Current design boundaries
+
+| Area | Current choice |
+| --- | --- |
+| Projects | One project per Coordinator |
+| Coding agents | Codex first |
+| Scheduling | Explicit Agent selection; one active code task |
+| Git | One configurable shared working branch |
+| Context | Shared SQLite conversation plus per-Agent Codex thread |
+| Approval | Agent owner handles native Codex approval locally |
+| Deployment | Self-hosted Coordinator and owner-hosted Runners |
+
+Multi-project operation, parallel isolated worktrees, automatic routing, additional Agent adapters, and managed cloud infrastructure are tracked in the [roadmap](roadmap.md).

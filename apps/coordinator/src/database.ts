@@ -42,7 +42,7 @@ export class CoordinatorDatabase {
         shared_branch TEXT NOT NULL,
         test_command TEXT NOT NULL
       );
-      INSERT OR IGNORE INTO settings VALUES (1, 'Team Agent Alpha', '', 'main', 'internal-alpha', '');
+      INSERT OR IGNORE INTO settings VALUES (1, 'Team Agent', '', 'main', 'team-agent', '');
 
       CREATE TABLE IF NOT EXISTS coordinator_secrets (
         key TEXT PRIMARY KEY,

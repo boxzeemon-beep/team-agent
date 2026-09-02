@@ -81,9 +81,6 @@ importers:
 
   apps/runner:
     dependencies:
-      '@team-agent/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       ws:
         specifier: ^8.18.3
         version: 8.21.3
@@ -91,6 +88,9 @@ importers:
         specifier: ^4.1.5
         version: 4.5.4
     devDependencies:
+      '@team-agent/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1

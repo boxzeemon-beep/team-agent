@@ -1,0 +1,83 @@
+# Roadmap
+
+Team Agent's product promise is simple: **share coding agents across your team—without sharing credentials.** The roadmap prioritizes a fast first success, a clear trust model, and an adapter ecosystem without obscuring the current product boundaries.
+
+This document describes direction, not a compatibility guarantee. Release scope is determined by tested behavior in the repository and published release notes.
+
+## Now: dependable source release
+
+- [x] Browser invitations and member sessions
+- [x] One-time Runner pairing and persistent device identity
+- [x] Explicit Agent selection, offline waiting, and reassignment
+- [x] Project-wide serial task scheduling
+- [x] Shared project context with per-Agent cursors
+- [x] Codex app-server execution on the owner's computer
+- [x] Managed Git clone, tests, commit, and push
+- [x] Progress, owner-waiting, diff, tests, and commit history
+- [x] SQLite and Runner restart recovery
+- [ ] Complete the public release checklist and publish versioned release notes
+
+## Next: five-minute first task
+
+- [x] Docker Compose distribution for the Coordinator
+- [ ] Publish versioned Runner artifacts for supported operating systems
+- [x] `team-agent` CLI for pairing, starting, diagnostics, and managed-clone recovery
+- [x] `team-agent doctor` checks for Codex, Git, Coordinator networking, and storage
+- [ ] Reproducible sample repository and end-to-end walkthrough
+- [x] Product screenshots and a short workflow recording
+- [ ] Upgrade, backup, and rollback documentation
+
+The intended release interface is:
+
+```bash
+# Coordinator source-build interface
+docker compose up -d
+
+# Runner release interface
+team-agent runner --coordinator COORDINATOR_URL --pair PAIRING_TOKEN
+```
+
+The Coordinator command works from the current source tree. The Runner interface is implemented; the global command becomes available through the tagged release artifact or npm package.
+
+## Then: Agent adapter ecosystem
+
+- [ ] Stabilize and document the Agent adapter lifecycle
+- [ ] Keep Codex as the reference adapter
+- [ ] Ship a second coding-agent adapter to validate portability
+- [ ] Publish adapter fixtures and conformance tests
+- [ ] Add capability and version reporting without automatic task routing
+
+## Later: team-scale workflows
+
+- [ ] Multiple projects per Coordinator
+- [ ] Isolated worktrees and opt-in parallel task execution
+- [ ] Web-mediated approval workflows
+- [ ] GitHub App integration and repository event links
+- [ ] Notifications for owner approval and completed tasks
+- [ ] Role and repository permission controls for larger teams
+- [ ] Operational metrics and audit export
+
+## Product constraints that remain explicit
+
+Until a capability is released and tested, Team Agent should continue to present these boundaries clearly:
+
+- one project per Coordinator;
+- one active code task per project;
+- requester-selected Agents rather than automatic routing;
+- Codex first;
+- one configurable shared working branch;
+- self-hosted coordination and owner-hosted execution.
+
+## Release gates
+
+A packaged release should meet these gates before a broad launch:
+
+- a new user can complete the documented setup without a source checkout;
+- median time to the first completed task is measurable and under ten minutes in a clean test environment;
+- Coordinator and Runner restart recovery pass automated and manual checks;
+- security, backup, upgrade, and rollback paths are documented;
+- every supported platform is tested in CI or listed with a clear qualification;
+- the sample workflow produces an inspectable diff, test result, and commit;
+- known limitations are visible in the README and release notes.
+
+Feature proposals belong in [GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions). Implementation-ready bugs and scoped changes belong in [GitHub Issues](https://github.com/boxzeemon-beep/team-agent/issues).

@@ -1,7 +1,7 @@
 {
-  "name": "team-agent-alpha",
+  "name": "team-agent",
   "version": "0.1.0",
-  "description": "A lightweight shared Agent workspace for team software projects",
+  "description": "Share coding agents across your team without sharing credentials",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -24,6 +24,7 @@
     "coordinator:built": "node apps/coordinator/dist/server/index.js",
     "coordinator:dev": "pnpm --filter @team-agent/coordinator dev",
     "runner": "tsx apps/runner/src/cli.ts",
+    "doctor": "tsx apps/runner/src/cli.ts doctor",
     "runner:built": "node apps/runner/dist/cli.js"
   },
   "devDependencies": {

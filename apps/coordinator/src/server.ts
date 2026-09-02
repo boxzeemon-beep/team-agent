@@ -117,6 +117,12 @@ export async function createApp(
   const bootstrapInvite =
     db.countMembers() === 0 ? makeBootstrapInvite() : null;
 
+  app.get("/api/health", async () => ({
+    status: "ok",
+    service: "team-agent-coordinator",
+    version: "0.1.0",
+  }));
+
   const authenticated = async (
     request: FastifyRequest,
     reply: FastifyReply,
@@ -346,7 +352,7 @@ export async function createApp(
     const result: PairingResponse = {
       pairingToken: raw,
       expiresAt,
-      command: `pnpm runner --coordinator ${JSON.stringify(publicUrl)} --pair ${JSON.stringify(raw)} --name ${JSON.stringify(displayName)}`,
+      command: `npx --yes --package=https://github.com/boxzeemon-beep/team-agent/releases/latest/download/team-agent-runner.tgz team-agent runner --coordinator ${JSON.stringify(publicUrl)} --pair ${JSON.stringify(raw)} --name ${JSON.stringify(displayName)}`,
     };
     return result;
   });
@@ -798,7 +804,7 @@ export async function createApp(
       reply
         .type("text/html")
         .send(
-          "<!doctype html><title>Team Agent Alpha</title><h1>Team Agent Alpha</h1><p>Web assets have not been built yet.</p>",
+          "<!doctype html><title>Team Agent</title><h1>Team Agent</h1><p>Web assets have not been built yet.</p>",
         ),
     );
   }

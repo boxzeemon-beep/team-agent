@@ -1,0 +1,30 @@
+services:
+  coordinator:
+    build:
+      context: .
+    image: ghcr.io/boxzeemon-beep/team-agent:latest
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${TEAM_AGENT_PORT:-4310}:4310"
+    environment:
+      TEAM_AGENT_HOST: 0.0.0.0
+      TEAM_AGENT_PORT: 4310
+      TEAM_AGENT_DATA_DIR: /data
+      TEAM_AGENT_PUBLIC_URL: "${TEAM_AGENT_PUBLIC_URL:-http://localhost:4310}"
+      TEAM_AGENT_LOG_LEVEL: "${TEAM_AGENT_LOG_LEVEL:-info}"
+    volumes:
+      - team-agent-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4310/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  team-agent-data:
