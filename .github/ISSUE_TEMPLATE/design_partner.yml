@@ -1,0 +1,66 @@
+name: Design partner application
+description: Try Team Agent with a real team workflow and help shape the next releases.
+title: "[Design partner]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping Team Agent learn from real teams. This issue is public: describe the workflow without sharing private repository names, source code, credentials, tokens, customer data, or personal contact details.
+  - type: dropdown
+    id: team_size
+    attributes:
+      label: Team size
+      options:
+        - 2–5 people
+        - 6–15 people
+        - 16–50 people
+        - More than 50 people
+    validations:
+      required: true
+  - type: dropdown
+    id: agent_owners
+    attributes:
+      label: Expected Agent owners
+      description: How many teammates could contribute a local Codex Runner?
+      options:
+        - One
+        - Two
+        - Three or more
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow to test
+      description: What should a browser-only teammate be able to ask a shared Agent to do?
+      placeholder: A product manager asks a teammate's Agent to update a small UI flow and run the existing test suite.
+    validations:
+      required: true
+  - type: textarea
+    id: current_process
+    attributes:
+      label: Current process
+      description: How does the team handle this work today, and where does it slow down?
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Coordinator deployment
+      options:
+        - Docker Compose on a team computer or server
+        - Source checkout on a team computer or server
+        - Still evaluating
+    validations:
+      required: true
+  - type: checkboxes
+    id: participation
+    attributes:
+      label: Participation
+      options:
+        - label: We can run at least one bounded task and share product feedback.
+          required: true
+        - label: We understand that Team Agent is currently Codex-first, single-project, and serializes code tasks.
+          required: true
+        - label: We removed private project and account information from this issue.
+          required: true

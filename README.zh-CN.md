@@ -32,7 +32,7 @@ Codex 登录信息和 Git 凭据始终留在 Runner 所有者的电脑上。
 - **由发起人明确选择 Agent。** 目标 Agent 离线时任务会等待，也可重新指派。
 - **共享项目上下文。** Runner 会收到该 Agent 上次参与之后新增的讨论与 commit。
 - **执行结果可审计。** 已完成任务保留发起人、Agent 所有者、对话、diff、测试和 commit SHA。
-- **避免分支竞争。** 项目级执行锁保证同一时间只有一个活动代码任务。
+- **串行处理 Agent 写入。** 项目级执行锁使两个 Team Agent 代码任务不会同时运行。
 
 ## 产品流程
 
@@ -45,6 +45,18 @@ Codex 登录信息和 Git 凭据始终留在 Runner 所有者的电脑上。
 7. 网页实时展示进度，并保存回复、diff、测试结果与 commit。
 
 Codex 原生审批仍由 Agent 所有者在本机处理；需要审批时，网页会显示“等待所有者”。
+
+## 五分钟本地 Smoke Demo
+
+从全新 checkout 开始，准备 Node.js 22.5+、Git，以及 pnpm 11 或 Corepack，即可先运行 Coordinator 与 Runner 协议的核心链路，再配置 Docker、远端 Git 仓库或 Codex：
+
+```bash
+./examples/smoke-demo/run.sh
+```
+
+Windows 用户可以运行 `powershell -ExecutionPolicy Bypass -File .\examples\smoke-demo\run.ps1`。该示例会启动真实的 Coordinator 与 SQLite，配对一个确定性的协议 Runner，分配任务，修改隔离的本地 Git 仓库，运行测试，推送共享分支，并核验保存的 diff、测试输出和 commit SHA。
+
+预期输出以及这个免凭据 smoke test 与真实 Codex Runner 之间的边界，见[五分钟示例说明](docs/quickstart-demo.md)。
 
 ## 快速开始
 
@@ -67,8 +79,11 @@ Runner 主机还需要：
 git clone https://github.com/boxzeemon-beep/team-agent.git
 cd team-agent
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d
 ```
+
+默认 Compose 配置会直接拉取已发布的 Coordinator 镜像
+`ghcr.io/boxzeemon-beep/team-agent:0.1.0`，首次启动无需在本机编译源码。0.1.0 镜像发布平台为 `linux/amd64`，Apple 芯片上的 Docker Desktop 会使用模拟运行。选择其他已发布镜像或平台时，在 `.env` 中设置 `TEAM_AGENT_IMAGE` 和 `TEAM_AGENT_PLATFORM`。
 
 在 `.env` 中把 `TEAM_AGENT_PUBLIC_URL` 设置为团队实际使用的 HTTPS 地址。Docker Compose 会发布 `4310` 端口，应通过私网或主机防火墙限制访问。使用 Tailscale Serve 时运行：
 
@@ -79,7 +94,13 @@ tailscale serve status
 
 修改 `.env` 后重启容器。通过 `docker compose logs coordinator` 查看第一个一次性管理员邀请；具名 Docker Volume 会在容器重启后保留 Coordinator 状态。
 
-源码开发需要 Node.js 22.5+ 与 pnpm 11，可运行 `pnpm coordinator` 或 `pnpm coordinator:built`；源码进程默认监听 `127.0.0.1:4310`。
+需要从当前 checkout 构建本地容器时，明确叠加开发 Compose 配置：
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+不使用 Docker 的源码开发需要 Node.js 22.5+ 与 pnpm 11，可运行 `pnpm coordinator` 或 `pnpm coordinator:built`；源码进程默认监听 `127.0.0.1:4310`。
 
 ### 2. 配置项目
 
@@ -87,17 +108,16 @@ tailscale serve status
 
 ### 3. 配对 Runner
 
-Agent 所有者先安装 Runner、检查环境，再在项目页面点击“贡献我的 Codex”：
+Agent 所有者在项目页面点击“贡献我的 Codex”。页面会生成以下形式的一次性命令：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/boxzeemon-beep/team-agent/main/scripts/runner-install.sh | sh
-team-agent doctor --coordinator "https://COORDINATOR.example"
-team-agent runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "张三的 Codex"
+npx --yes --package=https://github.com/boxzeemon-beep/team-agent/releases/latest/download/team-agent-runner.tgz \
+  team-agent runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "张三的 Codex"
 ```
 
-PowerShell 用户可运行 `scripts/runner-install.ps1`。从源码开发的贡献者也可安装依赖，再通过 `pnpm runner -- ...` 使用相同参数。
+该命令直接运行最新 GitHub Release 产物，不依赖 npm 包已经发布。需要长期使用全局命令时，可运行 `scripts/runner-install.sh` 或 `scripts/runner-install.ps1`，再通过 `team-agent doctor --coordinator "https://COORDINATOR.example"` 检查主机环境。从源码开发的贡献者也可通过 `pnpm runner -- ...` 使用相同参数。
 
-配对 token 只使用一次。默认情况下，Runner 把设备身份、Codex Thread ID 和受管副本保存在 `~/.team-agent/runner/`。后续重启时省略 `--pair`，并继续使用相同数据目录。
+配对 token 只使用一次。默认情况下，Runner 把设备身份、Codex Thread ID 和受管副本保存在 `~/.team-agent/runner/`。后续使用相同 Coordinator、名称和数据目录重启，并省略 `--pair`。
 
 ## 架构
 
@@ -157,8 +177,8 @@ packages/shared/    Coordinator、网页和 Runner 共享的类型与协议
 
 近期优先级：
 
-1. 可复现、带版本的 Coordinator 与 Runner 发行包；
-2. 五分钟首任务教程与示例仓库；
+1. 可重复的纯净主机安装流程，以及升级、备份和回滚指南；
+2. 使用真实 Codex 的五分钟首任务教程与示例仓库；
 3. Agent Adapter 接口和第二种 Coding Agent；
 4. 多项目、隔离并行 worktree 与网页审批。
 
@@ -178,6 +198,14 @@ pnpm build
 ```
 
 自动化测试覆盖邀请与 Cookie、Runner 配对、串行调度、跳过离线 Agent、结果持久化与 SQLite 重启恢复。参与开发前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 加入首批 20 个设计伙伴团队
+
+我们正在招募 20 个团队，用 Team Agent 尝试一个边界清晰的开发任务，并共同确定后续版本的优先级。
+
+- 如果团队可以完成一个边界清晰的任务并提供产品反馈，请[申请成为设计伙伴](https://github.com/boxzeemon-beep/team-agent/issues/new?template=design_partner.yml)。申请内容会成为公开 Issue，请只填写脱敏信息。
+- 如果已经开始使用 Team Agent，请[分享一份脱敏工作流](https://github.com/boxzeemon-beep/team-agent/issues/new?template=workflow_story.yml)。
+- 安装问题和产品想法可以发布到 [GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions)。
 
 ## 开源协议
 

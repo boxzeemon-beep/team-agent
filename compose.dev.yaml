@@ -1,0 +1,5 @@
+services:
+  coordinator:
+    image: team-agent:dev
+    build:
+      context: .

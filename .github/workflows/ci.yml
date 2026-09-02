@@ -42,4 +42,5 @@ jobs:
       - run: pnpm exec biome check .
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm demo:smoke
       - run: pnpm build

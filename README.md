@@ -32,7 +32,7 @@ No Codex login or Git credential is uploaded to the Coordinator.
 - **Make agent choice explicit.** The requester chooses whose Agent should do the work; offline work waits or can be reassigned.
 - **Preserve team context.** Each Runner receives the project discussion and commits added since its Agent last participated.
 - **Keep changes auditable.** Completed tasks include the requester, Agent owner, messages, diff, tests, and commit SHA.
-- **Avoid branch races.** One project-wide execution lock serializes active code tasks.
+- **Serialize Agent writes.** One project-wide execution lock prevents two Team Agent code tasks from running at the same time.
 
 ## How it works
 
@@ -46,17 +46,29 @@ No Codex login or Git credential is uploaded to the Coordinator.
 
 Native Codex approvals remain on the Agent owner's computer. When approval is needed, the task is shown as **waiting for owner**.
 
+## Prove the workflow in five minutes
+
+From a fresh checkout with Node.js 22.5+, Git, and pnpm 11 or Corepack, run the core Coordinator and Runner-protocol loop before configuring Docker, a remote Git host, or Codex:
+
+```bash
+./examples/smoke-demo/run.sh
+```
+
+Windows users can run `powershell -ExecutionPolicy Bypass -File .\examples\smoke-demo\run.ps1`. The demo starts the real Coordinator and SQLite store, pairs a deterministic protocol Runner, assigns a task, changes an isolated local Git repository, runs a test, pushes a shared branch, and verifies the stored diff, test output, and commit SHA.
+
+See the [five-minute demo guide](docs/quickstart-demo.md) for expected output and the exact boundary between this credential-free smoke test and a real Codex Runner.
+
 ## Quickstart
 
 ### Requirements
 
-**Coordinator host**
+#### Coordinator host
 
 - Docker with Compose
 - A Git repository writable by all contributing Agent owners
 - A private HTTPS route to the Coordinator; [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) is the documented path
 
-**Runner host**
+#### Runner host
 
 - Node.js 22.5+ and npm for the Runner installer
 - Codex CLI installed and signed in
@@ -71,8 +83,14 @@ Browser-only members install nothing.
 git clone https://github.com/boxzeemon-beep/team-agent.git
 cd team-agent
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d
 ```
+
+The default Compose configuration pulls the released Coordinator image
+`ghcr.io/boxzeemon-beep/team-agent:0.1.0`, so the first start does not build the
+source tree. Version 0.1.0 is published for `linux/amd64`; Docker Desktop uses
+emulation on Apple silicon. Set `TEAM_AGENT_IMAGE` and `TEAM_AGENT_PLATFORM` in
+`.env` when selecting another published image or platform.
 
 Set `TEAM_AGENT_PUBLIC_URL` in `.env` to the HTTPS URL your team will use. Docker Compose publishes port `4310`; restrict that port to your private network or host firewall. With Tailscale Serve:
 
@@ -83,7 +101,16 @@ tailscale serve status
 
 Restart the stack after changing `.env`. The first one-time administrator invite is available in `docker compose logs coordinator`. The named Docker volume preserves Coordinator state across container restarts.
 
-For source development instead, use Node.js 22.5+ and pnpm 11, then run `pnpm coordinator` or `pnpm coordinator:built`; the source process listens on `127.0.0.1:4310` by default.
+For a local container built from the current checkout, apply the development
+override explicitly:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+For source development without Docker, use Node.js 22.5+ and pnpm 11, then run
+`pnpm coordinator` or `pnpm coordinator:built`; the source process listens on
+`127.0.0.1:4310` by default.
 
 ### 2. Configure a project
 
@@ -99,17 +126,16 @@ Generate one invite per teammate from the project page.
 
 ### 3. Pair a Runner
 
-On the Agent owner's computer, install the released Runner, verify its environment, then open the project and click **Contribute my Codex**:
+On the Agent owner's computer, open the project and click **Contribute my Codex**. The page generates a single-use command in this form:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/boxzeemon-beep/team-agent/main/scripts/runner-install.sh | sh
-team-agent doctor --coordinator "https://COORDINATOR.example"
-team-agent runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "Alex's Codex"
+npx --yes --package=https://github.com/boxzeemon-beep/team-agent/releases/latest/download/team-agent-runner.tgz \
+  team-agent runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "Alex's Codex"
 ```
 
-PowerShell users can run `scripts/runner-install.ps1`. Contributors working from a source checkout can install dependencies and use `pnpm runner -- ...` with the same options.
+The command runs the latest GitHub Release artifact directly and does not assume that an npm package has been published. For a persistent global command, use `scripts/runner-install.sh` or `scripts/runner-install.ps1`, then verify the host with `team-agent doctor --coordinator "https://COORDINATOR.example"`. Contributors working from a source checkout can use `pnpm runner -- ...` with the same options.
 
-The pairing token is single-use. The Runner stores its device identity, Codex thread IDs, and managed clones under `~/.team-agent/runner/` unless `--data-dir` is set. Restart it later without `--pair`, using the same data directory.
+The pairing token is single-use. The Runner stores its device identity, Codex thread IDs, and managed clones under `~/.team-agent/runner/` unless `--data-dir` is set. Restart it later with the same Coordinator, name, and data directory, but without `--pair`.
 
 ## Architecture
 
@@ -174,8 +200,8 @@ Team Agent deliberately starts with one project, Codex, and serialized execution
 
 Near-term priorities:
 
-1. Reproducible, versioned Coordinator and Runner release artifacts.
-2. A 5-minute first-task walkthrough and sample repository.
+1. Repeatable clean-host installation plus upgrade, backup, and rollback guidance.
+2. A 5-minute real-Codex first-task walkthrough and sample repository.
 3. A documented Agent adapter interface, followed by a second coding-agent integration.
 4. Multi-project support, isolated parallel worktrees, and web-based approval workflows.
 
@@ -198,6 +224,14 @@ pnpm build
 The automated suite covers invitations and cookies, Runner pairing, serial scheduling, offline-Agent skipping, result persistence, and SQLite restart recovery.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to get started. If Team Agent solves a real problem for your team, share the workflow that worked—those examples will shape the adapter API and installation experience.
+
+## Join the first 20 design partners
+
+We are looking for 20 teams to try one bounded development task with Team Agent and help prioritize the next releases.
+
+- [Apply as a design partner](https://github.com/boxzeemon-beep/team-agent/issues/new?template=design_partner.yml) if your team can run one bounded task and share product feedback. The application is a public issue, so use sanitized details.
+- [Share a sanitized workflow](https://github.com/boxzeemon-beep/team-agent/issues/new?template=workflow_story.yml) if you already use Team Agent.
+- Use [GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions) for setup questions and product ideas.
 
 ## License
 

@@ -25,6 +25,7 @@
     "coordinator:dev": "pnpm --filter @team-agent/coordinator dev",
     "runner": "tsx apps/runner/src/cli.ts",
     "doctor": "tsx apps/runner/src/cli.ts doctor",
+    "demo:smoke": "tsx examples/smoke-demo/run.ts",
     "runner:built": "node apps/runner/dist/cli.js"
   },
   "devDependencies": {

@@ -22,6 +22,18 @@ pnpm test
 pnpm build
 ```
 
+The default `compose.yaml` is the user installation path and pulls the pinned
+GHCR release. To build and run the Coordinator container from your current
+checkout, use the development override:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+Override `TEAM_AGENT_IMAGE` and `TEAM_AGENT_PLATFORM` when testing a specific
+published image. Keep the values in `.env.example` and the defaults in
+`compose.yaml` aligned.
+
 ## Pull requests
 
 - Add or update tests for behavior changes.
@@ -36,5 +48,5 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
-中文说明：功能变更请同时补充测试与中英文文档；开放式产品讨论请使用
+中文说明：默认 `compose.yaml` 会拉取固定版本的 GHCR 镜像；从当前源码构建容器时，请叠加 `compose.dev.yaml`。功能变更请同时补充测试与中英文文档；开放式产品讨论请使用
 [GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions)，可复现的问题请提交 Issue。
