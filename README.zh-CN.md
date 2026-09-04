@@ -9,7 +9,7 @@ _画面来自隔离演示数据下的真实产品状态。_
 [![CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](README.md) · [架构](docs/architecture.md) · [安全](SECURITY.md) · [路线图](ROADMAP.md) · [参与贡献](CONTRIBUTING.md)
+[English](README.md) · [RPG 体验](docs/rpg-experience.md) · [架构](docs/architecture.md) · [安全](SECURITY.md) · [路线图](ROADMAP.md) · [参与贡献](CONTRIBUTING.md)
 
 Team Agent 让只有浏览器的成员，把开发任务交给其他成员贡献的 Codex Runner。Runner 在所有者的电脑上使用其已有的 Codex 和 Git 登录状态；Coordinator 保存团队共享对话、串行调度代码任务并记录执行结果。
 

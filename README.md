@@ -9,7 +9,7 @@ _Real product states shown with isolated demo data._
 [![CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[简体中文](README.zh-CN.md) · [Architecture](docs/architecture.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[简体中文](README.zh-CN.md) · [RPG experience](docs/rpg-experience.md) · [Architecture](docs/architecture.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 Team Agent lets a teammate who only has a browser assign a coding task to a Codex Runner contributed by another team member. The Runner works on its owner's computer with that owner's existing Codex and Git sessions. A central Coordinator keeps the shared conversation, serializes code changes, and records the result.
 
