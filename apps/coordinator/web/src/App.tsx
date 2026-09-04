@@ -20,20 +20,20 @@ import {
 import { ApiError, api, getSnapshot, json } from "./api.js";
 
 const taskStatus: Record<TaskStatus, { label: string; tone: string }> = {
-  queued: { label: "等待接取", tone: "neutral" },
-  waiting_for_agent: { label: "等待 Agent 归队", tone: "warn" },
-  running: { label: "远征中", tone: "active" },
+  queued: { label: "任务队列中", tone: "neutral" },
+  waiting_for_agent: { label: "等待 Agent", tone: "warn" },
+  running: { label: "执行中", tone: "active" },
   waiting_for_owner: { label: "等待所有者", tone: "warn" },
-  completed: { label: "委托完成", tone: "success" },
-  needs_attention: { label: "遭遇阻碍", tone: "danger" },
-  canceled: { label: "已撤回", tone: "neutral" },
+  completed: { label: "任务完成", tone: "success" },
+  needs_attention: { label: "需要处理", tone: "danger" },
+  canceled: { label: "已取消", tone: "neutral" },
 };
 
 const agentStatus: Record<AgentStatus, { label: string; tone: string }> = {
-  online: { label: "待命", tone: "success" },
-  busy: { label: "远征中", tone: "active" },
-  offline: { label: "离开公会", tone: "neutral" },
-  paused: { label: "休整中", tone: "warn" },
+  online: { label: "在线待命", tone: "success" },
+  busy: { label: "执行中", tone: "active" },
+  offline: { label: "离线", tone: "neutral" },
+  paused: { label: "已暂停", tone: "warn" },
 };
 
 const agentConnectionLevel: Record<AgentStatus, number> = {
@@ -99,12 +99,12 @@ function ClaimView({
     <main className="auth-shell">
       <section className="auth-card">
         <div className="brand-mark">TA</div>
-        <p className="eyebrow">TEAM AGENT · THE CODING GUILD</p>
-        <h1>{token ? "加入开发者公会" : "这座公会需要邀请"}</h1>
+        <p className="eyebrow">TEAM AGENT · JOINT OPERATIONS</p>
+        <h1>{token ? "加入协作行动" : "此行动大厅需要邀请"}</h1>
         <p className="muted auth-copy">
           {token
-            ? "加入后，你可以召集并借用队友共享的 Codex Agent，一起完成真实的项目委托。"
-            : "使用公会管理员发给你的个人邀请链接进入项目世界。"}
+            ? "加入后，你可以接入并借用队友共享的 Codex Agent，一起推进真实开发任务。"
+            : "使用项目管理员发给你的个人邀请链接进入行动大厅。"}
         </p>
         {token ? (
           <form onSubmit={submit} className="stack">
@@ -124,12 +124,12 @@ function ClaimView({
               className="button button-primary button-large"
               disabled={busy || !name.trim()}
             >
-              {busy && <Spinner />}进入公会
+              {busy && <Spinner />}进入行动大厅
             </button>
           </form>
         ) : (
           <div className="invite-hint">
-            公会邀请通常形如 <code>?token=••••••</code>
+            行动邀请通常形如 <code>?token=••••••</code>
           </div>
         )}
       </section>
@@ -159,9 +159,9 @@ function AgentCard({
           <strong>{agent.displayName}</strong>
           {mine && <span className="mine-label">我的</span>}
         </div>
-        <span className="muted small">由 {agent.ownerName} 召集</span>
+        <span className="muted small">由 {agent.ownerName} 接入</span>
         <span className="muted micro">
-          最近归队：{formatTime(agent.lastSeenAt)}
+          最近连接：{formatTime(agent.lastSeenAt)}
         </span>
       </div>
       <div className="agent-actions">
@@ -173,7 +173,7 @@ function AgentCard({
             disabled={busy || agent.status === "busy"}
             onClick={() => onToggle(agent)}
           >
-            {agent.status === "paused" ? "结束休整" : "进入休整"}
+            {agent.status === "paused" ? "恢复共享" : "暂停共享"}
           </button>
         )}
       </div>
@@ -355,7 +355,7 @@ function TaskDetail({
                   )
                 }
               >
-                撤回委托
+                取消任务
               </button>
             )}
           <button
@@ -438,15 +438,15 @@ function TaskDetail({
             {task.error ? "!" : task.status === "running" ? <Spinner /> : "·"}
           </span>
           <div>
-            <strong>{task.error ? "委托遭遇阻碍" : "远征动态"}</strong>
+            <strong>{task.error ? "任务需要处理" : "执行动态"}</strong>
             <p>{task.error || task.progress}</p>
           </div>
         </div>
       )}
       <div className="conversation">
-        <h3>冒险日志 · 项目对话</h3>
+        <h3>行动日志 · 项目对话</h3>
         {task.messages.length === 0 ? (
-          <p className="empty-inline">这项委托还没有后续消息。</p>
+          <p className="empty-inline">这项任务还没有后续消息。</p>
         ) : (
           task.messages.map((message) => (
             <div className={`message message-${message.role}`} key={message.id}>
@@ -468,7 +468,7 @@ function TaskDetail({
         <section className="result-box">
           <span>✓</span>
           <div>
-            <h3>任务战报 · 执行结果</h3>
+            <h3>行动战报 · 执行结果</h3>
             <p>{task.result}</p>
           </div>
         </section>
@@ -482,13 +482,13 @@ function TaskDetail({
         variant="diff"
       />
       <CodePanel
-        title="测试检定 · Test Output"
+        title="测试结果 · Test Output"
         value={task.testOutput}
         variant="plain"
       />
       {task.commitSha && (
         <div className="commit-row">
-          <span>公会存档 · Commit</span>
+          <span>任务提交 · Commit</span>
           <code>{task.commitSha}</code>
           <button
             type="button"
@@ -638,12 +638,12 @@ function PairModal({ onClose }: { onClose: () => void }) {
     setTimeout(() => setCopied(false), 1800);
   }
   return (
-    <Modal title="召集我的 Codex Agent" onClose={onClose}>
+    <Modal title="接入我的 Codex Agent" onClose={onClose}>
       {pairing ? (
         <div className="stack">
           <div className="step">
             <span>1</span>
-            <p>确认召集 Agent 的电脑已安装并登录 Codex。</p>
+            <p>确认 Agent 所在电脑已安装并登录 Codex。</p>
           </div>
           <div className="step">
             <span>2</span>
@@ -661,14 +661,14 @@ function PairModal({ onClose }: { onClose: () => void }) {
           </div>
           <p className="muted small">
             命令有效期至 {formatTime(pairing.expiresAt)}。Runner
-            归队后，所有公会成员都能看到并指派你的 Agent。
+            连接后，所有项目成员都能看到并指派你的 Agent。
           </p>
         </div>
       ) : (
         <form onSubmit={create} className="stack">
           <p className="muted">
-            共享开启期间，公会成员可以明确选择并借用这台电脑上的
-            Codex。你随时可以让它进入休整。
+            共享开启期间，项目成员可以明确选择并借用这台电脑上的
+            Codex。你随时可以暂停共享。
           </p>
           <label className="field">
             <span>Agent 显示名称</span>
@@ -685,7 +685,7 @@ function PairModal({ onClose }: { onClose: () => void }) {
             className="button button-primary button-large"
             disabled={busy || !name.trim()}
           >
-            {busy && <Spinner />}生成召集命令
+            {busy && <Spinner />}生成接入命令
           </button>
         </form>
       )}
@@ -734,11 +734,11 @@ function AdminModal({
     }
   }
   return (
-    <Modal title="公会设置" onClose={onClose}>
+    <Modal title="行动大厅设置" onClose={onClose}>
       <div className="admin-section">
         <div>
-          <h3>邀请公会成员</h3>
-          <p className="muted small">每枚邀请印记仅供一位成员使用。</p>
+          <h3>邀请项目成员</h3>
+          <p className="muted small">每个邀请链接仅供一位成员使用。</p>
         </div>
         {invite ? (
           <div className="invite-result">
@@ -765,7 +765,7 @@ function AdminModal({
       </div>
       <hr />
       <form onSubmit={save} className="settings-grid">
-        <h3>项目世界设置</h3>
+        <h3>行动项目设置</h3>
         <label className="field">
           <span>项目名称</span>
           <input
@@ -849,13 +849,14 @@ function Dashboard({
   );
   const [pairOpen, setPairOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [composerOpen, setComposerOpen] = useState(true);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [agentId, setAgentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const partyRef = useRef<HTMLElement>(null);
   const questsRef = useRef<HTMLElement>(null);
+  const briefRef = useRef<HTMLTextAreaElement>(null);
   const availableAgents = useMemo(
     () => snapshot.agents.filter((agent) => agent.status !== "paused"),
     [snapshot.agents],
@@ -911,9 +912,33 @@ function Dashboard({
   const onlineRatio = snapshot.agents.length
     ? Math.round((onlineCount / snapshot.agents.length) * 100)
     : 0;
-  const chapterNumber = Math.floor(completedCount / 5) + 1;
-  const chapterStep = completedCount % 5;
-  const chapterProgress = chapterStep * 20;
+  const completionProgress = snapshot.tasks.length
+    ? Math.round((completedCount / snapshot.tasks.length) * 100)
+    : 0;
+  const launchAgent = snapshot.agents.find((agent) => agent.id === agentId);
+  const canLaunch = Boolean(
+    prompt.trim() && launchAgent && launchAgent.status !== "paused",
+  );
+  const launchLabel = !prompt.trim()
+    ? "输入任务目标"
+    : !launchAgent || launchAgent.status === "paused"
+      ? "选择可用 Agent"
+      : launchAgent.status === "busy"
+        ? "加入任务队列"
+        : launchAgent.status === "offline"
+          ? "排队等待 Agent"
+          : "开始任务";
+  const launchHint = !prompt.trim()
+    ? "先描述要完成的开发目标"
+    : !launchAgent
+      ? "从右侧小队选择执行 Agent"
+      : launchAgent.status === "busy"
+        ? "当前任务结束后自动执行"
+        : launchAgent.status === "offline"
+          ? "Agent 连接后自动执行"
+          : launchAgent.status === "paused"
+            ? "该 Agent 当前暂停共享"
+            : "立即进入项目执行队列";
 
   async function createTask(event: FormEvent) {
     event.preventDefault();
@@ -972,6 +997,9 @@ function Dashboard({
     if (openComposer) setComposerOpen(true);
     questsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+  const focusBrief = useCallback(() => {
+    briefRef.current?.focus();
+  }, []);
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -998,7 +1026,7 @@ function Dashboard({
       }
       if (event.code === "KeyQ") {
         event.preventDefault();
-        revealQuests(true);
+        focusBrief();
       }
       if (event.code === "KeyP") {
         event.preventDefault();
@@ -1026,15 +1054,16 @@ function Dashboard({
     adminOpen,
     revealParty,
     revealQuests,
+    focusBrief,
   ]);
   return (
-    <div className="app-shell rpg-shell">
+    <div className="app-shell tactical-shell">
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark small-mark">TA</div>
           <div>
             <strong>{snapshot.settings.projectName}</strong>
-            <span>THE CODING GUILD · 团队 Agent 公会</span>
+            <span>JOINT AGENT OPERATIONS · 协作行动大厅</span>
           </div>
         </div>
         <div className="header-right">
@@ -1049,7 +1078,7 @@ function Dashboard({
               onClick={() => setAdminOpen(true)}
               aria-keyshortcuts="Alt+G"
             >
-              公会设置
+              大厅设置
             </button>
           )}
           <div className="user-chip">
@@ -1059,10 +1088,82 @@ function Dashboard({
         </div>
       </header>
 
-      <section className="game-stage" aria-label="项目世界总览">
+      <section className="game-stage" aria-label="协作行动大厅">
         <div className="scene-vignette" aria-hidden="true" />
 
-        <aside className="player-hud" aria-label="当前队伍状态">
+        <nav className="command-wheel" aria-label="大厅快捷导航">
+          <button
+            type="button"
+            className="command-action command-top"
+            onClick={focusBrief}
+            aria-keyshortcuts="Alt+Q"
+          >
+            <span>01</span>
+            <small>任务</small>
+            <kbd>ALT Q</kbd>
+          </button>
+          <button
+            type="button"
+            className="command-action command-right"
+            onClick={() => setPairOpen(true)}
+            aria-keyshortcuts="Alt+C"
+          >
+            <span>02</span>
+            <small>接入</small>
+            <kbd>ALT C</kbd>
+          </button>
+          <button
+            type="button"
+            className="command-action command-bottom"
+            onClick={() => revealQuests()}
+            aria-keyshortcuts="Alt+J"
+          >
+            <span>03</span>
+            <small>战报</small>
+            <kbd>ALT J</kbd>
+          </button>
+          <button
+            type="button"
+            className="command-action command-left"
+            onClick={revealParty}
+            aria-keyshortcuts="Alt+P"
+          >
+            <span>04</span>
+            <small>小队</small>
+            <kbd>ALT P</kbd>
+          </button>
+          <span className="command-core" aria-hidden="true">
+            OPS
+          </span>
+        </nav>
+
+        <aside className="world-map" aria-label="当前行动项目">
+          <span className="map-heading">OPERATION MODE</span>
+          <div className="mini-map" aria-hidden="true">
+            <span className="map-ring" />
+            <span className="map-node map-node-party" />
+            <span className="map-node map-node-quests" />
+            <span className="map-player">TA</span>
+            <span className="map-sweep" />
+          </div>
+          <div className="mode-copy">
+            <span>协作开发 · 串行执行</span>
+            <strong>{snapshot.settings.projectName}</strong>
+            <small>
+              {snapshot.settings.sharedBranch} · {snapshot.tasks.length} 项任务
+            </small>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              snapshot.me.isAdmin ? setAdminOpen(true) : revealQuests()
+            }
+          >
+            {snapshot.me.isAdmin ? "项目配置" : "查看任务"} →
+          </button>
+        </aside>
+
+        <aside className="player-hud" aria-label="当前选择的 Agent">
           <div className="player-crest" aria-hidden="true">
             <span>
               {focusedAgent ? initials(focusedAgent.ownerName) : "TA"}
@@ -1073,14 +1174,14 @@ function Dashboard({
           </div>
           <div className="hud-meters">
             <div className="hud-title">
-              <span>CURRENT AGENT</span>
-              <strong>{focusedAgent?.displayName ?? "等待 Agent 归队"}</strong>
+              <span>SELECTED AGENT</span>
+              <strong>{focusedAgent?.displayName ?? "等待 Agent 接入"}</strong>
             </div>
             <div className="hud-meter hud-meter-crimson">
               <i style={{ width: `${onlineRatio}%` }} />
             </div>
             <small>
-              队伍链接 · {onlineCount}/{snapshot.agents.length || 0} 待命
+              可立即执行 · {onlineCount}/{snapshot.agents.length || 0} 待命
             </small>
             <div className="hud-meter hud-meter-cyan">
               <i
@@ -1090,105 +1191,88 @@ function Dashboard({
               />
             </div>
             <small>
-              Agent 连接 ·{" "}
+              当前状态 ·{" "}
               {focusedAgent
                 ? agentStatus[focusedAgent.status].label
-                : "尚未召集"}
+                : "尚未接入"}
             </small>
             <div className="hud-meter hud-meter-gold">
-              <i style={{ width: `${chapterProgress}%` }} />
+              <i style={{ width: `${completionProgress}%` }} />
             </div>
             <small>
-              公会第 {chapterNumber} 章 · {chapterStep}/5 项委托
+              已完成 · {completedCount}/{snapshot.tasks.length} 项任务
             </small>
           </div>
         </aside>
 
-        <aside className="world-map" aria-label="项目地图">
-          <span className="map-heading">PROJECT MAP</span>
-          <div className="mini-map">
-            <span className="map-ring" aria-hidden="true" />
-            <button
-              type="button"
-              className="map-node map-node-party"
-              onClick={revealParty}
-              aria-label="前往 Agent 队伍"
-              title="Agent 队伍"
-            />
-            <button
-              type="button"
-              className="map-node map-node-quests"
-              onClick={() => revealQuests()}
-              aria-label="前往委托日志"
-              title="委托日志"
-            />
-            <button
-              type="button"
-              className="map-player"
-              onClick={() => revealQuests(true)}
-              aria-label="发布新委托"
-              title="发布新委托"
-            >
-              ▲
-            </button>
-            <span className="map-sweep" aria-hidden="true" />
-          </div>
-          <strong>{snapshot.settings.sharedBranch}</strong>
-          <span>
-            {snapshot.tasks.length} 项委托 · {completedCount} 已完成
-          </span>
-        </aside>
+        <section className="world-objective">
+          <p className="eyebrow">OPERATION BRIEF · 行动任务</p>
+          <h2>{running ? "下一项任务可以继续排队" : "准备下一项开发任务"}</h2>
+          <form className="lobby-launcher" onSubmit={createTask}>
+            <label className="lobby-prompt">
+              <span>任务目标</span>
+              <textarea
+                ref={briefRef}
+                rows={2}
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="描述要交给 Agent 完成的真实开发任务…"
+              />
+            </label>
+            <div className="launcher-footer">
+              <div className="launcher-agent">
+                <span>
+                  {focusedAgent ? initials(focusedAgent.ownerName) : "--"}
+                </span>
+                <div>
+                  <small>执行 Agent</small>
+                  <strong>{launchAgent?.displayName ?? "从小队选择"}</strong>
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="button button-primary button-large objective-button"
+                disabled={busy || !canLaunch}
+              >
+                <span>{busy ? <Spinner /> : "▶"}</span>
+                <b>{busy ? "正在发布" : launchLabel}</b>
+                <small>{launchHint}</small>
+              </button>
+            </div>
+            {error && <div className="alert alert-error">{error}</div>}
+          </form>
+        </section>
 
-        <div className="world-objective">
-          <p className="eyebrow">ACT {chapterNumber} · THE SHARED CODEX</p>
-          <h1>集结 Agent，开启项目远征</h1>
-          <p>
-            选择队友共享的
-            Codex，把真实开发任务变成一场所有人都能参与的协作冒险。
-          </p>
-          <button
-            type="button"
-            className="button button-primary button-large objective-button"
-            onClick={() => revealQuests(true)}
-            aria-keyshortcuts="Alt+Q"
-          >
-            <span aria-hidden="true">⚑</span> 打开委托板
-            <kbd>ALT Q</kbd>
-          </button>
-        </div>
-
-        <div
+        <aside
           className={`now-running world-expedition ${running ? "" : "is-idle"}`}
-          role="status"
-          aria-live="polite"
         >
           <span className="live-pulse" />
-          <div>
+          <div role="status" aria-live="polite">
             <b>
               {running
-                ? `${running.selectedAgentName} 正在远征`
-                : "公会之门已经开启"}
+                ? `${running.selectedAgentName} 正在执行`
+                : "项目执行通道空闲"}
             </b>
             <span>
               {running?.progress ||
                 running?.prompt ||
-                "从委托板选择一项任务，或者发布新的项目委托。"}
+                "选择 Agent，输入目标，然后开始下一项任务。"}
             </span>
           </div>
           <button
             type="button"
-            onClick={() =>
-              running ? chooseTask(running.id) : revealQuests(true)
-            }
+            onClick={() => (running ? chooseTask(running.id) : focusBrief())}
           >
-            {running ? "查看战况 →" : "选择委托 →"}
+            {running ? "查看执行 →" : "输入任务 →"}
           </button>
-        </div>
+        </aside>
 
         <fieldset className="party-dock">
           <legend className="dock-label">
-            <span>ACTIVE PARTY</span>
-            <small>ALT + 1–4 指派</small>
+            <span>AGENT SQUAD · 执行小队</span>
+            <small>
+              {onlineCount}/{snapshot.agents.length} 待命 · ALT 1–4
+            </small>
           </legend>
           <div className="party-slots">
             {snapshot.agents.slice(0, 4).map((agent, index) => (
@@ -1204,7 +1288,13 @@ function Dashboard({
                 title={`${agent.displayName} · ${agentStatus[agent.status].label}`}
               >
                 <kbd>{index + 1}</kbd>
-                <span>{initials(agent.ownerName)}</span>
+                <span className="slot-avatar">{initials(agent.ownerName)}</span>
+                <span className="slot-copy">
+                  <strong>{agent.displayName}</strong>
+                  <small>
+                    {agent.ownerName} · {agentStatus[agent.status].label}
+                  </small>
+                </span>
                 <i aria-hidden="true" />
               </button>
             ))}
@@ -1216,70 +1306,28 @@ function Dashboard({
                   className="party-slot party-slot-empty"
                   key={slotId}
                   onClick={() => setPairOpen(true)}
-                  title="召集新的 Codex Agent"
-                  aria-label="召集新的 Codex Agent"
+                  title="接入新的 Codex Agent"
+                  aria-label="接入新的 Codex Agent"
                   aria-keyshortcuts={`Alt+${snapshot.agents.length + index + 1}`}
                 >
                   <kbd>{snapshot.agents.length + index + 1}</kbd>
-                  <span>＋</span>
+                  <span className="slot-avatar">＋</span>
+                  <span className="slot-copy">
+                    <strong>接入 Agent</strong>
+                    <small>空闲小队席位</small>
+                  </span>
                 </button>
               ))}
           </div>
         </fieldset>
 
-        <nav className="command-wheel" aria-label="公会快捷指令">
-          <button
-            type="button"
-            className="command-action command-top"
-            onClick={() => revealQuests(true)}
-            aria-keyshortcuts="Alt+Q"
-          >
-            <span>⚑</span>
-            <small>委托</small>
-            <kbd>ALT Q</kbd>
-          </button>
-          <button
-            type="button"
-            className="command-action command-right"
-            onClick={() => setPairOpen(true)}
-            aria-keyshortcuts="Alt+C"
-          >
-            <span>＋</span>
-            <small>召集</small>
-            <kbd>ALT C</kbd>
-          </button>
-          <button
-            type="button"
-            className="command-action command-bottom"
-            onClick={() => revealQuests()}
-            aria-keyshortcuts="Alt+J"
-          >
-            <span>≡</span>
-            <small>日志</small>
-            <kbd>ALT J</kbd>
-          </button>
-          <button
-            type="button"
-            className="command-action command-left"
-            onClick={revealParty}
-            aria-keyshortcuts="Alt+P"
-          >
-            <span>◆</span>
-            <small>队伍</small>
-            <kbd>ALT P</kbd>
-          </button>
-          <span className="command-core" aria-hidden="true">
-            TA
-          </span>
-        </nav>
-
         <button
           type="button"
           className="scroll-cue"
           onClick={revealParty}
-          aria-label="进入公会界面"
+          aria-label="查看完整行动记录"
         >
-          <span>进入公会界面</span>
+          <span>完整行动记录</span>
           <i aria-hidden="true">⌄</i>
         </button>
       </section>
@@ -1287,22 +1335,22 @@ function Dashboard({
       <main className="workspace">
         <section className="hero campaign-summary">
           <div>
-            <p className="eyebrow">GUILD CAMPAIGN · 公会战役</p>
+            <p className="eyebrow">OPERATIONS CENTER · 行动记录</p>
             <h1>{snapshot.settings.projectName}</h1>
-            <p>每项委托都继承同一份项目对话、代码状态与真实 Git 记录。</p>
+            <p>每项任务都继承同一份项目对话、代码状态与真实 Git 记录。</p>
           </div>
           <div className="hero-summary">
             <div>
               <b>{snapshot.agents.length}</b>
-              <span>队伍 Agent</span>
+              <span>小队 Agent</span>
             </div>
             <div>
               <b>{completedCount}</b>
-              <span>完成委托</span>
+              <span>完成任务</span>
             </div>
             <div>
               <b>{snapshot.settings.sharedBranch}</b>
-              <span>当前路线 · Branch</span>
+              <span>行动分支 · Branch</span>
             </div>
           </div>
         </section>
@@ -1310,16 +1358,16 @@ function Dashboard({
         <section className="section-block party-section" ref={partyRef}>
           <div className="section-heading">
             <div>
-              <p className="section-kicker">PARTY</p>
-              <h2>Agent 队伍</h2>
-              <p>从队友共享的 Codex 中选择本次委托的执行者。</p>
+              <p className="section-kicker">AGENT SQUAD</p>
+              <h2>执行小队</h2>
+              <p>查看团队共享的 Codex，并选择下一项任务的执行 Agent。</p>
             </div>
             <button
               type="button"
               className="button button-secondary"
               onClick={() => setPairOpen(true)}
             >
-              ＋ 召集我的 Codex
+              ＋ 接入我的 Codex
             </button>
           </div>
           {snapshot.agents.length ? (
@@ -1337,14 +1385,14 @@ function Dashboard({
           ) : (
             <div className="empty-state compact">
               <div>⌁</div>
-              <h3>队伍尚未集结</h3>
-              <p>召集第一位 Codex Agent，所有成员就能开始发布委托。</p>
+              <h3>小队尚未接入 Agent</h3>
+              <p>接入第一位 Codex Agent，所有成员就能开始发布任务。</p>
               <button
                 type="button"
                 className="button button-primary"
                 onClick={() => setPairOpen(true)}
               >
-                召集我的 Codex
+                接入我的 Codex
               </button>
             </div>
           )}
@@ -1356,22 +1404,22 @@ function Dashboard({
         >
           <div className="section-heading">
             <div>
-              <p className="section-kicker">QUEST BOARD</p>
-              <h2>项目委托</h2>
-              <p>同一时间展开一场远征，后续委托按可用 Agent 排队。</p>
+              <p className="section-kicker">MISSION LOG</p>
+              <h2>项目任务</h2>
+              <p>同一时间执行一项代码任务，其他任务按可用 Agent 排队。</p>
             </div>
             <button
               type="button"
               className="button button-primary"
               onClick={() => setComposerOpen(!composerOpen)}
             >
-              {composerOpen ? "收起委托单" : "＋ 发布委托"}
+              {composerOpen ? "收起任务输入" : "＋ 发布任务"}
             </button>
           </div>
           {composerOpen && (
             <form className="composer" onSubmit={createTask}>
               <label className="composer-prompt">
-                <span>委托目标</span>
+                <span>任务目标</span>
                 <textarea
                   rows={4}
                   value={prompt}
@@ -1412,8 +1460,8 @@ function Dashboard({
               </div>
               {!availableAgents.length && (
                 <p className="muted small" role="status">
-                  当前没有可指派的 Agent。请先召集一台
-                  Codex，或让所有者结束休整。
+                  当前没有可指派的 Agent。请先接入一台
+                  Codex，或让所有者恢复共享。
                 </p>
               )}
               {error && <div className="alert alert-error">{error}</div>}
@@ -1421,7 +1469,7 @@ function Dashboard({
           )}
           {sortedTasks.length ? (
             <div className="tasks-layout">
-              <aside className="task-list" aria-label="委托列表">
+              <aside className="task-list" aria-label="任务列表">
                 {sortedTasks.map((task) => (
                   <TaskCard
                     key={task.id}
@@ -1452,21 +1500,21 @@ function Dashboard({
                   onRefresh={refresh}
                 />
               ) : (
-                <div className="empty-detail">选择一项委托查看任务战报</div>
+                <div className="empty-detail">选择一项任务查看行动战报</div>
               )}
             </div>
           ) : (
             <div className="empty-state">
               <div>✓</div>
-              <h3>发布第一项真实委托</h3>
+              <h3>发布第一项真实任务</h3>
               <p>写下目标、指派 Agent，所有进展与代码证据都会记录在这里。</p>
             </div>
           )}
         </section>
       </main>
       <footer>
-        <span>Team Agent · The Coding Guild</span>
-        <span>项目世界：{snapshot.settings.repositoryUrl || "尚未配置"}</span>
+        <span>Team Agent · Joint Operations</span>
+        <span>行动项目：{snapshot.settings.repositoryUrl || "尚未配置"}</span>
       </footer>
       {pairOpen && <PairModal onClose={() => setPairOpen(false)} />}
       {adminOpen && (
@@ -1511,7 +1559,7 @@ export function App() {
       <main className="loading-screen">
         <div className="brand-mark">TA</div>
         <Spinner />
-        <p>正在进入项目世界…</p>
+        <p>正在进入协作行动大厅…</p>
       </main>
     );
   if (state.kind === "claim")
@@ -1520,7 +1568,7 @@ export function App() {
     return (
       <main className="loading-screen">
         <div className="error-glyph">!</div>
-        <h2>通往公会的连接中断</h2>
+        <h2>行动大厅连接中断</h2>
         <p>{state.message}</p>
         <button type="button" className="button button-primary" onClick={load}>
           重新连接
