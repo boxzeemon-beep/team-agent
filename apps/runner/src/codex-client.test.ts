@@ -29,6 +29,34 @@ afterEach(async () => {
 });
 
 describe("CodexAppServerClient lifecycle", () => {
+  it("identifies itself with the shared release version", async () => {
+    const root = await mkdtemp(join(tmpdir(), "team-agent-codex-version-"));
+    roots.push(root);
+    const marker = join(root, "client-info.json");
+    process.env.CODEX_BIN = await fakeServer(`
+const fs = require("node:fs");
+const readline = require("node:readline");
+readline.createInterface({ input: process.stdin }).on("line", line => {
+  const message = JSON.parse(line);
+  if (message.method === "initialize") {
+    fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify(message.params.clientInfo));
+    reply(message.id, {});
+  }
+  if (message.method === "account/read") reply(message.id, { account: { type: "chatgpt" } });
+});
+function reply(id, result) { process.stdout.write(JSON.stringify({ id, result }) + "\\n"); }
+`);
+
+    const client = new CodexAppServerClient();
+    await client.start();
+    expect(JSON.parse(await readFile(marker, "utf8"))).toEqual({
+      name: "team-agent-runner",
+      title: "Team Agent Runner",
+      version: "0.2.0",
+    });
+    await client.close();
+  });
+
   it("does not lose completion notifications sharing the turn/start chunk", async () => {
     process.env.CODEX_BIN = await fakeServer(`
 const readline = require("node:readline");

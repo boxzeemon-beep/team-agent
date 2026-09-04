@@ -1,7 +1,6 @@
 services:
   coordinator:
-    image: "${TEAM_AGENT_IMAGE:-ghcr.io/boxzeemon-beep/team-agent:0.1.0}"
-    platform: "${TEAM_AGENT_PLATFORM:-linux/amd64}"
+    image: "${TEAM_AGENT_IMAGE:-ghcr.io/boxzeemon-beep/team-agent:0.2.0}"
     init: true
     restart: unless-stopped
     ports:

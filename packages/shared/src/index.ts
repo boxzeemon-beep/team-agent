@@ -1,4 +1,8 @@
 import { z } from "zod";
+import packageMetadata from "../package.json" with { type: "json" };
+
+/** Release version shared by the Coordinator and Runner at build time. */
+export const TEAM_AGENT_VERSION = packageMetadata.version;
 
 export const agentStatuses = ["online", "busy", "offline", "paused"] as const;
 export const taskStatuses = [

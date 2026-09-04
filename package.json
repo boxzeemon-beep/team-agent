@@ -1,7 +1,7 @@
 {
   "name": "team-agent",
-  "version": "0.1.0",
-  "description": "Share coding agents across your team without sharing credentials",
+  "version": "0.2.0",
+  "description": "The multiplayer lobby for your team's local coding agents",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -25,6 +25,7 @@
     "coordinator:dev": "pnpm --filter @team-agent/coordinator dev",
     "runner": "tsx apps/runner/src/cli.ts",
     "doctor": "tsx apps/runner/src/cli.ts doctor",
+    "demo:playground": "tsx scripts/demo-playground.ts",
     "demo:smoke": "tsx examples/smoke-demo/run.ts",
     "runner:built": "node apps/runner/dist/cli.js"
   },

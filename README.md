@@ -1,38 +1,110 @@
+<p align="center">
+  <img src="docs/assets/social-preview.png" alt="Team Agent — the multiplayer lobby for coding agents" width="100%" />
+</p>
+
 # Team Agent
 
-**Share coding agents across your team—without sharing credentials.**
+**The multiplayer lobby for your team's coding agents.**
 
-![Team Agent demo: choose a teammate's Agent, follow execution, and inspect the result](docs/assets/team-agent-demo.gif)
+Let anyone on your team send coding tasks from a browser—even if they do not
+have a local coding agent. They choose a teammate's Codex, follow the work live,
+and inspect the response, diff, tests, and commit when it finishes.
 
-_Real product states shown with isolated demo data._
+**Codex and Git credentials stay on the Agent owner's computer.**
+
+[▶ Open the demo lobby](#open-the-demo-lobby) ·
+[🚀 Deploy for your team](#deploy-for-your-team) ·
+[⭐ Star Team Agent](https://github.com/boxzeemon-beep/team-agent)
 
 [![CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/boxzeemon-beep/team-agent)](https://github.com/boxzeemon-beep/team-agent/releases/latest)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-43853d.svg)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [简体中文](README.zh-CN.md) · [Tactical lobby](docs/tactical-lobby-experience.md) · [Architecture](docs/architecture.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-Team Agent lets a teammate who only has a browser assign a coding task to a Codex Runner contributed by another team member. The Runner works on its owner's computer with that owner's existing Codex and Git sessions. A central Coordinator keeps the shared conversation, serializes code changes, and records the result.
+![Team Agent demo: choose a teammate's Agent, follow execution, and inspect the result](docs/assets/team-agent-demo.gif)
+
+**Pick your squad → launch a task → watch it work → review the evidence**
+
+_[Watch the MP4](docs/assets/team-agent-demo.mp4) · [See every workflow state](docs/quickstart-demo.md). Released tactical UI; task evidence is clearly labelled as simulated._
+
+## Understand Team Agent in 30 seconds
+
+1. **Contribute an Agent.** A teammate pairs a Runner with their existing local Codex and Git sessions.
+2. **Borrow it from the browser.** Another teammate writes a task and explicitly chooses which Agent should run it.
+3. **Follow the mission.** The Coordinator streams progress, carries forward project context, and serializes code writes.
+4. **Review the evidence.** Every completed task records the requester, Agent owner, messages, response, diff, tests, and commit.
 
 ```text
-Requester writes a task
-        ↓
-Explicitly chooses a teammate's Agent
-        ↓
-Owner's Runner uses local Codex + Git credentials
-        ↓
-Team sees progress, response, diff, tests, and commit
+Browser-only teammate
+        ↓ chooses
+Teammate's Agent
+        ↓ works through
+Local Codex + local Git credentials
+        ↓ returns
+Response + diff + tests + commit
 ```
 
 No Codex login or Git credential is uploaded to the Coordinator.
 
-## Why Team Agent
+## Why teams use Team Agent
 
-- **Let every teammate participate.** Members without a local coding agent only need the web app.
-- **Keep credentials on the owner's machine.** The Runner reuses local Codex and Git sessions.
-- **Make agent choice explicit.** The requester chooses whose Agent should do the work; offline work waits or can be reassigned.
-- **Preserve team context.** Each Runner receives the project discussion and commits added since its Agent last participated.
-- **Keep changes auditable.** Completed tasks include the requester, Agent owner, messages, diff, tests, and commit SHA.
-- **Serialize Agent writes.** One project-wide execution lock prevents two Team Agent code tasks from running at the same time.
+### Access without account sharing
+
+Browser-only teammates can use contributed Agents while Codex and Git
+credentials remain on their owners' computers.
+
+### Explicit control
+
+The requester chooses the Agent. Offline tasks wait or can be reassigned;
+project writes remain serialized by one project-wide execution lock.
+
+### Results you can review
+
+The team sees who requested the task, which Agent ran it, what changed, which
+tests ran, and which commit was created.
+
+## Open the demo lobby
+
+Run the populated tactical lobby without a Codex login or Git repository:
+
+```bash
+docker run --rm -p 127.0.0.1:4310:4310 -e TEAM_AGENT_DEMO_MODE=1 \
+  ghcr.io/boxzeemon-beep/team-agent:0.2.0
+```
+
+Open <http://127.0.0.1:4310>. Pick the online Demo Agent and submit a task. It
+will move through `queued → running → completed`, then show an explicitly
+simulated result, diff, tests, and commit. Demo Mode never launches Codex or
+touches a Git repository; Runner pairing and deployment-management actions are
+disabled. The command binds the playground to your local machine only.
+
+From a source checkout, run `pnpm install` followed by `pnpm demo:playground`
+and open <http://127.0.0.1:4311>.
+
+## Try it in 5 minutes
+
+Run the real Coordinator, SQLite store, Runner protocol, task queue, Git change,
+test, commit, and push flow on one computer. This smoke demo does not require
+Docker, a remote Git host, a public tunnel, or a Codex login.
+
+```bash
+git clone https://github.com/boxzeemon-beep/team-agent.git
+cd team-agent
+./examples/smoke-demo/run.sh
+```
+
+A successful run ends with:
+
+```text
+SMOKE DEMO PASSED
+Validated: invite → pairing → Runner → task → Git → completion
+```
+
+Windows users can run `powershell -ExecutionPolicy Bypass -File .\examples\smoke-demo\run.ps1`.
+
+[Read the demo guide](docs/quickstart-demo.md) · [Connect a real Codex Runner](#3-pair-a-runner)
 
 ## How it works
 
@@ -46,19 +118,7 @@ No Codex login or Git credential is uploaded to the Coordinator.
 
 Native Codex approvals remain on the Agent owner's computer. When approval is needed, the task is shown as **waiting for owner**.
 
-## Prove the workflow in five minutes
-
-From a fresh checkout with Node.js 22.5+, Git, and pnpm 11 or Corepack, run the core Coordinator and Runner-protocol loop before configuring Docker, a remote Git host, or Codex:
-
-```bash
-./examples/smoke-demo/run.sh
-```
-
-Windows users can run `powershell -ExecutionPolicy Bypass -File .\examples\smoke-demo\run.ps1`. The demo starts the real Coordinator and SQLite store, pairs a deterministic protocol Runner, assigns a task, changes an isolated local Git repository, runs a test, pushes a shared branch, and verifies the stored diff, test output, and commit SHA.
-
-See the [five-minute demo guide](docs/quickstart-demo.md) for expected output and the exact boundary between this credential-free smoke test and a real Codex Runner.
-
-## Quickstart
+## Deploy for your team
 
 ### Requirements
 
@@ -86,11 +146,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The default Compose configuration pulls the released Coordinator image
-`ghcr.io/boxzeemon-beep/team-agent:0.1.0`, so the first start does not build the
-source tree. Version 0.1.0 is published for `linux/amd64`; Docker Desktop uses
-emulation on Apple silicon. Set `TEAM_AGENT_IMAGE` and `TEAM_AGENT_PLATFORM` in
-`.env` when selecting another published image or platform.
+The default Compose configuration pulls the released multi-architecture
+Coordinator image `ghcr.io/boxzeemon-beep/team-agent:0.2.0`, so the first start
+does not build the source tree. Docker selects the published `linux/amd64` or
+`linux/arm64` image for the current host. Set `TEAM_AGENT_IMAGE` in `.env` when
+pinning another published version.
 
 Set `TEAM_AGENT_PUBLIC_URL` in `.env` to the HTTPS URL your team will use. Docker Compose publishes port `4310`; restrict that port to your private network or host firewall. With Tailscale Serve:
 
@@ -224,6 +284,15 @@ pnpm build
 The automated suite covers invitations and cookies, Runner pairing, serial scheduling, offline-Agent skipping, result persistence, and SQLite restart recovery.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to get started. If Team Agent solves a real problem for your team, share the workflow that worked—those examples will shape the adapter API and installation experience.
+
+## Build the shared-Agent workflow with us
+
+If Team Agent would help your team:
+
+- ⭐ [Star the repository](https://github.com/boxzeemon-beep/team-agent)
+- ▶ [Open the demo lobby](#open-the-demo-lobby)
+- 💬 [Tell us about your workflow](https://github.com/boxzeemon-beep/team-agent/discussions)
+- 🛠️ [Pick a contribution](CONTRIBUTING.md)
 
 ## Join the first 20 design partners
 

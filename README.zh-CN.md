@@ -1,38 +1,104 @@
+<p align="center">
+  <img src="docs/assets/social-preview.png" alt="Team Agent——团队 Coding Agent 的多人协作大厅" width="100%" />
+</p>
+
 # Team Agent
 
-**让团队共享 Coding Agent，而不共享账号和凭据。**
+**团队 Coding Agent 的多人协作大厅。**
 
-![Team Agent 演示：选择队友的 Agent、跟踪执行并查看结果](docs/assets/team-agent-demo.gif)
+团队成员只需打开浏览器，就能选择并借用队友贡献的 Codex，提交开发任务、
+实时查看执行过程，并在完成后检查回复、diff、测试结果与 commit。
 
-_画面来自隔离演示数据下的真实产品状态。_
+**Codex 与 Git 凭据始终留在 Agent 所有者的电脑上。**
+
+[▶ 打开试玩大厅](#打开试玩大厅) ·
+[🚀 部署给团队使用](#部署给团队使用) ·
+[⭐ Star Team Agent](https://github.com/boxzeemon-beep/team-agent)
 
 [![CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml)
+[![最新版本](https://img.shields.io/github/v/release/boxzeemon-beep/team-agent)](https://github.com/boxzeemon-beep/team-agent/releases/latest)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-43853d.svg)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [English](README.md) · [战术大厅体验](docs/tactical-lobby-experience.md) · [架构](docs/architecture.md) · [安全](SECURITY.md) · [路线图](ROADMAP.md) · [参与贡献](CONTRIBUTING.md)
 
-Team Agent 让只有浏览器的成员，把开发任务交给其他成员贡献的 Codex Runner。Runner 在所有者的电脑上使用其已有的 Codex 和 Git 登录状态；Coordinator 保存团队共享对话、串行调度代码任务并记录执行结果。
+![Team Agent 演示：选择队友的 Agent、跟踪执行并查看结果](docs/assets/team-agent-demo.gif)
+
+**选择 Agent → 发布任务 → 观看执行 → 审查结果**
+
+_[观看 MP4](docs/assets/team-agent-demo.mp4) · [查看全部工作流状态](docs/quickstart-demo.md)。画面来自正式战术大厅，任务证据均明确标注为模拟数据。_
+
+## 30 秒理解 Team Agent
+
+1. **贡献 Agent。** 成员把 Runner 与自己已经登录的本机 Codex 和 Git 会话配对。
+2. **从浏览器借用。** 其他成员输入任务，并明确选择由哪一位 Agent 执行。
+3. **实时观看行动。** Coordinator 传递项目上下文、展示进度，并保证代码任务串行执行。
+4. **审查完整结果。** 每次完成都记录发起人、Agent 所有者、对话、回复、diff、测试与 commit。
 
 ```text
-发起人输入任务
-      ↓
-明确选择一位队友的 Agent
-      ↓
-所有者的 Runner 使用本机 Codex 与 Git 身份
-      ↓
-团队查看进度、回复、diff、测试与 commit
+只使用浏览器的成员
+        ↓ 选择
+队友贡献的 Agent
+        ↓ 使用
+所有者本机 Codex + 本机 Git 凭据
+        ↓ 返回
+回复 + diff + 测试 + commit
 ```
 
-Codex 登录信息和 Git 凭据始终留在 Runner 所有者的电脑上。
+Codex 登录信息和 Git 凭据不会上传到 Coordinator。
 
-## 为什么使用 Team Agent
+## 为什么团队使用 Team Agent
 
-- **让每位成员都能参与。** 没有本地 Coding Agent 的成员只需打开网页。
-- **凭据留在本机。** Runner 复用所有者已有的 Codex 与 Git 会话。
-- **由发起人明确选择 Agent。** 目标 Agent 离线时任务会等待，也可重新指派。
-- **共享项目上下文。** Runner 会收到该 Agent 上次参与之后新增的讨论与 commit。
-- **执行结果可审计。** 已完成任务保留发起人、Agent 所有者、对话、diff、测试和 commit SHA。
-- **串行处理 Agent 写入。** 项目级执行锁使两个 Team Agent 代码任务不会同时运行。
+### 借用能力，而不是共享账号
+
+只使用浏览器的成员也能调用团队 Agent，Codex 与 Git 凭据留在所有者本机。
+
+### Agent 选择透明可控
+
+任务发起人明确选择 Agent；离线任务可以等待或重新指派，项目级执行锁保证代码任务串行运行。
+
+### 每次执行都有完整证据
+
+团队可以查看发起人、实际 Agent、所有者、对话、回复、diff、测试与 commit。
+
+## 打开试玩大厅
+
+无需 Codex 登录或 Git 仓库，即可运行带有预置内容的战术大厅：
+
+```bash
+docker run --rm -p 127.0.0.1:4310:4310 -e TEAM_AGENT_DEMO_MODE=1 \
+  ghcr.io/boxzeemon-beep/team-agent:0.2.0
+```
+
+打开 <http://127.0.0.1:4310>，选择在线 Demo Agent 并提交任务。任务会依次进入
+`queued → running → completed`，然后展示明确标注为模拟数据的回复、diff、测试与
+commit。Demo Mode 不会启动 Codex，也不会访问 Git 仓库。
+Runner 配对与部署管理操作也会停用；上面的命令仅绑定本机回环地址。
+
+从源码启动时，先运行 `pnpm install`，再运行 `pnpm demo:playground`，并打开
+<http://127.0.0.1:4311>。
+
+## 五分钟体验完整流程
+
+在一台电脑上运行真实 Coordinator、SQLite、Runner 协议、任务队列、Git 修改、
+测试、commit 与 push 流程。这个演示不需要 Docker、远端 Git 仓库、公开隧道或 Codex 登录。
+
+```bash
+git clone https://github.com/boxzeemon-beep/team-agent.git
+cd team-agent
+./examples/smoke-demo/run.sh
+```
+
+成功时会看到：
+
+```text
+SMOKE DEMO PASSED
+Validated: invite → pairing → Runner → task → Git → completion
+```
+
+Windows 用户可以运行 `powershell -ExecutionPolicy Bypass -File .\examples\smoke-demo\run.ps1`。
+
+[阅读演示说明](docs/quickstart-demo.md) · [连接真实 Codex Runner](#3-配对-runner)
 
 ## 产品流程
 
@@ -46,19 +112,7 @@ Codex 登录信息和 Git 凭据始终留在 Runner 所有者的电脑上。
 
 Codex 原生审批仍由 Agent 所有者在本机处理；需要审批时，网页会显示“等待所有者”。
 
-## 五分钟本地 Smoke Demo
-
-从全新 checkout 开始，准备 Node.js 22.5+、Git，以及 pnpm 11 或 Corepack，即可先运行 Coordinator 与 Runner 协议的核心链路，再配置 Docker、远端 Git 仓库或 Codex：
-
-```bash
-./examples/smoke-demo/run.sh
-```
-
-Windows 用户可以运行 `powershell -ExecutionPolicy Bypass -File .\examples\smoke-demo\run.ps1`。该示例会启动真实的 Coordinator 与 SQLite，配对一个确定性的协议 Runner，分配任务，修改隔离的本地 Git 仓库，运行测试，推送共享分支，并核验保存的 diff、测试输出和 commit SHA。
-
-预期输出以及这个免凭据 smoke test 与真实 Codex Runner 之间的边界，见[五分钟示例说明](docs/quickstart-demo.md)。
-
-## 快速开始
+## 部署给团队使用
 
 ### 环境要求
 
@@ -82,8 +136,9 @@ cp .env.example .env
 docker compose up -d
 ```
 
-默认 Compose 配置会直接拉取已发布的 Coordinator 镜像
-`ghcr.io/boxzeemon-beep/team-agent:0.1.0`，首次启动无需在本机编译源码。0.1.0 镜像发布平台为 `linux/amd64`，Apple 芯片上的 Docker Desktop 会使用模拟运行。选择其他已发布镜像或平台时，在 `.env` 中设置 `TEAM_AGENT_IMAGE` 和 `TEAM_AGENT_PLATFORM`。
+默认 Compose 配置会直接拉取已发布的多架构 Coordinator 镜像
+`ghcr.io/boxzeemon-beep/team-agent:0.2.0`，首次启动无需在本机编译源码。Docker
+会根据当前主机选择 `linux/amd64` 或 `linux/arm64` 镜像；需要固定其他已发布版本时，在 `.env` 中设置 `TEAM_AGENT_IMAGE`。
 
 在 `.env` 中把 `TEAM_AGENT_PUBLIC_URL` 设置为团队实际使用的 HTTPS 地址。Docker Compose 会发布 `4310` 端口，应通过私网或主机防火墙限制访问。使用 Tailscale Serve 时运行：
 
@@ -198,6 +253,15 @@ pnpm build
 ```
 
 自动化测试覆盖邀请与 Cookie、Runner 配对、串行调度、跳过离线 Agent、结果持久化与 SQLite 重启恢复。参与开发前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 一起完善共享 Agent 工作流
+
+如果 Team Agent 对你的团队有价值：
+
+- ⭐ [Star 这个仓库](https://github.com/boxzeemon-beep/team-agent)
+- ▶ [打开试玩大厅](#打开试玩大厅)
+- 💬 [告诉我们你的使用场景](https://github.com/boxzeemon-beep/team-agent/discussions)
+- 🛠️ [选择一个贡献方向](CONTRIBUTING.md)
 
 ## 加入首批 20 个设计伙伴团队
 

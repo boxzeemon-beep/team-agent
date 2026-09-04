@@ -1,6 +1,6 @@
 {
   "name": "@team-agent/runner",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Share a local Codex agent with a Team Agent coordinator",
   "license": "MIT",
   "repository": {

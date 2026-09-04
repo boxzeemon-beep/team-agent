@@ -31,9 +31,11 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           package_version="$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")"
+          shared_version="$(node -p "JSON.parse(require('node:fs').readFileSync('packages/shared/package.json', 'utf8')).version")"
           coordinator_version="$(node -p "JSON.parse(require('node:fs').readFileSync('apps/coordinator/package.json', 'utf8')).version")"
           runner_version="$(node -p "JSON.parse(require('node:fs').readFileSync('apps/runner/package.json', 'utf8')).version")"
           test "${VERSION}" = "v${package_version}"
+          test "${VERSION}" = "v${shared_version}"
           test "${VERSION}" = "v${coordinator_version}"
           test "${VERSION}" = "v${runner_version}"
 
@@ -54,6 +56,9 @@ jobs:
 
           cd release
           sha256sum team-agent-*.tar.gz team-agent-runner.tgz > SHA256SUMS
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -78,6 +83,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.container-metadata.outputs.tags }}
           labels: ${{ steps.container-metadata.outputs.labels }}
@@ -88,9 +94,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          notes_args=(--generate-notes)
+          if [[ "${GITHUB_REF_NAME}" == "v0.2.0" && -f docs/releases/v0.2.0.md ]]; then
+            notes_args=(--notes-file docs/releases/v0.2.0.md)
+          fi
+
           gh release create "${GITHUB_REF_NAME}" \
             --verify-tag \
-            --generate-notes \
+            "${notes_args[@]}" \
             --title "Team Agent ${GITHUB_REF_NAME}" \
             release/team-agent-*.tar.gz \
             release/team-agent-runner.tgz \

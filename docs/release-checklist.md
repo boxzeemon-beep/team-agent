@@ -5,7 +5,7 @@ Use this checklist for a versioned Team Agent release. It focuses on reproducibl
 ## Distribution
 
 - [ ] Coordinator installation works from the documented release artifact.
-- [ ] The default Compose image/platform and `.env.example` pin the version being released.
+- [ ] The default Compose image and `.env.example` pin the version being released, and every documented architecture is published.
 - [ ] `compose.dev.yaml` still builds the Coordinator from the current checkout.
 - [ ] Runner installation works on every listed operating system.
 - [ ] Version and upgrade instructions are published.

@@ -71,7 +71,7 @@ describe("Runner doctor", () => {
         JSON.stringify({
           status: "ok",
           service: "team-agent-coordinator",
-          version: "0.1.0",
+          version: "0.2.0",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -82,7 +82,7 @@ describe("Runner doctor", () => {
         "https://example.test/team-agent/?ignored=yes",
         fetchHealth,
       ),
-    ).resolves.toContain("team-agent-coordinator 0.1.0");
+    ).resolves.toContain("team-agent-coordinator 0.2.0");
     expect(requestedUrl).toBe("https://example.test/team-agent/api/health");
   });
 
@@ -112,7 +112,7 @@ describe("Runner doctor", () => {
         nodeVersion: "22.5.0",
         async checkCoordinator(url) {
           checked.push(url);
-          return "team-agent-coordinator 0.1.0";
+          return "team-agent-coordinator 0.2.0";
         },
         async checkGit() {
           return "git version 2.50.0";
@@ -129,6 +129,6 @@ describe("Runner doctor", () => {
 
     expect(exitCode).toBe(0);
     expect(checked).toEqual(["https://team-agent.example"]);
-    expect(lines).toContain("PASS  Coordinator: team-agent-coordinator 0.1.0");
+    expect(lines).toContain("PASS  Coordinator: team-agent-coordinator 0.2.0");
   });
 });

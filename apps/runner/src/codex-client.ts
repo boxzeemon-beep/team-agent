@@ -7,7 +7,11 @@ import {
   createInterface as createPrompt,
   type Interface as PromptInterface,
 } from "node:readline/promises";
-import { runnerTextLimits, truncateText } from "@team-agent/shared";
+import {
+  runnerTextLimits,
+  TEAM_AGENT_VERSION,
+  truncateText,
+} from "@team-agent/shared";
 
 type JsonObject = Record<string, unknown>;
 
@@ -76,7 +80,7 @@ export class CodexAppServerClient {
         clientInfo: {
           name: "team-agent-runner",
           title: "Team Agent Runner",
-          version: "0.1.0",
+          version: TEAM_AGENT_VERSION,
         },
         capabilities: { experimentalApi: true, requestAttestation: false },
       });

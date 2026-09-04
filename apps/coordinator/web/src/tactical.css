@@ -297,6 +297,54 @@ input::placeholder {
   );
 }
 
+.demo-banner {
+  position: relative;
+  z-index: 20;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px clamp(16px, 3vw, 44px);
+  color: #dceff1;
+  background:
+    linear-gradient(90deg, rgba(20, 75, 84, 0.96), rgba(15, 45, 55, 0.98)),
+    #12343d;
+  border-bottom: 1px solid rgba(91, 222, 232, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.demo-banner-badge {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  color: #07161a;
+  background: #68e4e7;
+  border: 1px solid #b0f8f8;
+  font:
+    900 0.62rem ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  letter-spacing: 0.13em;
+}
+
+.demo-banner > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.demo-banner strong {
+  flex: 0 0 auto;
+  color: #f4ffff;
+  font-size: 0.8rem;
+}
+
+.demo-banner-copy {
+  color: #abd1d5;
+  font-size: 0.72rem;
+}
+
 .brand {
   gap: 12px;
 }
@@ -479,6 +527,16 @@ input::placeholder {
   );
   box-shadow: inset 3px 0 #f1a936;
   transform: none;
+}
+
+.command-readonly {
+  cursor: default;
+}
+
+.command-readonly:hover {
+  color: #c4d0d3;
+  background: transparent;
+  box-shadow: none;
 }
 
 .command-action > span,
@@ -1826,6 +1884,18 @@ footer {
   .presence,
   .user-chip {
     display: none;
+  }
+
+  .demo-banner {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 9px 12px;
+  }
+
+  .demo-banner > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .game-stage {

@@ -17,6 +17,7 @@ import {
   runnerClientMessageSchema,
   type Task,
   type TaskAssignment,
+  TEAM_AGENT_VERSION,
 } from "@team-agent/shared";
 import Fastify, {
   type FastifyInstance,
@@ -47,6 +48,10 @@ export interface CoordinatorOptions {
   webRoot?: string;
   heartbeatTimeoutMs?: number;
   heartbeatCheckMs?: number;
+  /** Enables the credential-free, simulated public playground. */
+  demoMode?: boolean;
+  /** Test hook; production demo pacing defaults to 900ms per transition. */
+  demoStepDelayMs?: number;
 }
 
 export interface CoordinatorApp {
@@ -65,16 +70,22 @@ interface RunnerConnection {
 export async function createApp(
   options: CoordinatorOptions = {},
 ): Promise<CoordinatorApp> {
+  const demoMode = options.demoMode ?? process.env.TEAM_AGENT_DEMO_MODE === "1";
+  const configuredDataDirectory = process.env.TEAM_AGENT_DATA_DIR;
+  const dataDirectory = configuredDataDirectory
+    ? demoMode
+      ? join(configuredDataDirectory, "demo")
+      : configuredDataDirectory
+    : demoMode
+      ? ".data/demo"
+      : ".data/coordinator";
   const dbPath =
-    options.databasePath ??
-    join(
-      process.env.TEAM_AGENT_DATA_DIR ?? ".data/coordinator",
-      "coordinator.sqlite",
-    );
+    options.databasePath ?? join(dataDirectory, "coordinator.sqlite");
   if (dbPath !== ":memory:")
     mkdirSync(dirname(resolve(dbPath)), { recursive: true });
   const db = new CoordinatorDatabase(dbPath);
   db.normalizeAfterRestart();
+  const demoMember = demoMode ? db.seedDemo() : null;
   const runnerCredentialSecret = db.getOrCreateSecret(
     "runner-credential-hmac-v1",
     token(),
@@ -89,9 +100,16 @@ export async function createApp(
   await app.register(websocket);
 
   const runners = new Map<string, RunnerConnection>();
-  const streams = new Set<FastifyReply>();
+  // Keep the authenticated member alongside each stream. Re-reading the
+  // cookie here used to drop broadcasts in Demo Mode, where authentication is
+  // intentionally supplied by the seeded member rather than a cookie.
+  const streams = new Map<
+    FastifyReply,
+    { member: Member; sessionHash: string | null }
+  >();
   let scheduling = false;
   let closing = false;
+  let demoTimer: NodeJS.Timeout | null = null;
 
   const makeInvite = (isAdmin: boolean, ttl = DEFAULT_INVITE_TTL) => {
     const raw = token();
@@ -120,13 +138,14 @@ export async function createApp(
   app.get("/api/health", async () => ({
     status: "ok",
     service: "team-agent-coordinator",
-    version: "0.1.0",
+    version: TEAM_AGENT_VERSION,
   }));
 
   const authenticated = async (
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<Member | undefined> => {
+    if (demoMember) return demoMember;
     const raw = request.cookies[SESSION_COOKIE];
     const member = raw ? db.memberBySessionHash(hash(raw)) : null;
     if (!member) {
@@ -137,14 +156,18 @@ export async function createApp(
   };
 
   const broadcast = () => {
-    for (const reply of streams) {
+    for (const [reply, subscriber] of streams) {
       try {
-        const raw = reply.request.cookies[SESSION_COOKIE];
-        const member = raw ? db.memberBySessionHash(hash(raw)) : null;
-        if (member)
-          reply.raw.write(
-            `event: snapshot\ndata: ${JSON.stringify(db.snapshot(member))}\n\n`,
-          );
+        const member = subscriber.sessionHash
+          ? db.memberBySessionHash(subscriber.sessionHash)
+          : subscriber.member;
+        if (!member) {
+          streams.delete(reply);
+          continue;
+        }
+        reply.raw.write(
+          `event: snapshot\ndata: ${JSON.stringify(db.snapshot(member))}\n\n`,
+        );
       } catch {
         streams.delete(reply);
       }
@@ -155,6 +178,113 @@ export async function createApp(
     socket.send(JSON.stringify(message));
   const isConnected = (agentId: string): boolean =>
     runners.get(agentId)?.socket.readyState === 1;
+
+  const demoResult = (task: Task) => ({
+    result:
+      "[DEMO RESULT] 模拟 Agent 已完成任务；未调用 Codex，也未读写或推送 Git 仓库。",
+    diff: [
+      "[DEMO DIFF — SIMULATED, NO FILES CHANGED]",
+      "--- a/src/demo-feature.ts",
+      "+++ b/src/demo-feature.ts",
+      "@@ -1 +1,2 @@",
+      `- // ${task.prompt.slice(0, 80)}`,
+      "+ export const demoFeature = 'completed';",
+    ].join("\n"),
+    test_output:
+      "[DEMO TESTS — SIMULATED]\nPASS demo/task-flow.test.ts (3 illustrative checks)",
+    commit_sha: `DEMO-COMMIT-${task.id.replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+  });
+
+  const scheduleDemo = () => {
+    if (!demoMode || closing || demoTimer) return;
+    const delay = options.demoStepDelayMs ?? 900;
+    const active = db.listTasks().find((task) => task.status === "running");
+    if (active) {
+      demoTimer = setTimeout(() => {
+        demoTimer = null;
+        if (closing) return;
+        const current = db.taskById(active.id);
+        if (current?.status !== "running") {
+          scheduleDemo();
+          return;
+        }
+        const result = demoResult(current);
+        if (
+          db.finishTask(
+            current.id,
+            current.selectedAgentId,
+            current.assignedThroughMessageSequence,
+            {
+              status: "completed",
+              progress: "[DEMO] Completed",
+              error: "",
+              ...result,
+            },
+          )
+        ) {
+          db.addMessage(
+            current.id,
+            null,
+            current.selectedAgentName,
+            "agent",
+            result.result,
+          );
+          broadcast();
+        }
+        scheduleDemo();
+      }, delay);
+      demoTimer.unref();
+      return;
+    }
+
+    // A waiting-for-owner task still owns the project-wide execution lock.
+    // It must remain idle until an explicit state transition rather than
+    // continuously scheduling timers that rediscover the same task.
+    if (db.hasActiveTask()) return;
+
+    const online = db
+      .listAgents()
+      .filter((agent) => agent.status === "online")
+      .map((agent) => agent.id);
+    const task = db.earliestRunnable(online);
+    if (!task) return;
+    demoTimer = setTimeout(() => {
+      demoTimer = null;
+      if (closing || db.hasActiveTask()) {
+        scheduleDemo();
+        return;
+      }
+      const current = db.taskById(task.id);
+      const agent = db.agentById(task.selectedAgentId);
+      if (!current || !agent || agent.status !== "online") {
+        scheduleDemo();
+        return;
+      }
+      const assignment = assignmentFor(current, agent);
+      if (
+        db.assignTask(
+          current.id,
+          agent.id,
+          assignment.contextThroughSequence,
+          assignment,
+        )
+      ) {
+        db.updateTaskFromRunner(current.id, agent.id, {
+          progress: "[DEMO] Simulating Agent work — no Codex or Git access",
+        });
+        db.addMessage(
+          current.id,
+          null,
+          agent.displayName,
+          "agent",
+          "[DEMO] 已进入模拟执行阶段。",
+        );
+        broadcast();
+      }
+      scheduleDemo();
+    }, delay);
+    demoTimer.unref();
+  };
 
   const deriveRunnerToken = (pairingToken: string, deviceId: string): string =>
     createHmac("sha256", runnerCredentialSecret)
@@ -223,6 +353,10 @@ export async function createApp(
   };
 
   const schedule = () => {
+    if (demoMode) {
+      scheduleDemo();
+      return;
+    }
     if (scheduling) return;
     scheduling = true;
     try {
@@ -254,6 +388,8 @@ export async function createApp(
   };
 
   app.post("/api/invites/claim", async (request, reply) => {
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     const body = request.body as { token?: unknown; name?: unknown };
     if (
       typeof body?.token !== "string" ||
@@ -296,6 +432,8 @@ export async function createApp(
   app.post("/api/logout", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     db.clearMemberSession(member.id);
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
@@ -309,6 +447,8 @@ export async function createApp(
   app.post("/api/invites", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     if (!member.isAdmin)
       return reply.code(403).send({ error: "admin_required" });
     const invite = makeInvite(false);
@@ -318,6 +458,8 @@ export async function createApp(
   app.put("/api/settings", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     if (!member.isAdmin)
       return reply.code(403).send({ error: "admin_required" });
     const parsed = projectSettingsSchema.safeParse(request.body);
@@ -333,6 +475,8 @@ export async function createApp(
   app.post("/api/agents/pair", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     const displayName =
       typeof (request.body as { displayName?: unknown })?.displayName ===
       "string"
@@ -360,6 +504,8 @@ export async function createApp(
   app.post("/api/agents/:id/pause", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     const agent = db.agentById((request.params as { id: string }).id);
     if (!agent) return reply.code(404).send({ error: "agent_not_found" });
     if (agent.ownerMemberId !== member.id)
@@ -374,6 +520,8 @@ export async function createApp(
   app.post("/api/agents/:id/resume", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     const agent = db.agentById((request.params as { id: string }).id);
     if (!agent) return reply.code(404).send({ error: "agent_not_found" });
     if (agent.ownerMemberId !== member.id)
@@ -387,6 +535,8 @@ export async function createApp(
   app.post("/api/agents/:id/status", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     const agent = db.agentById((request.params as { id: string }).id);
     if (!agent) return reply.code(404).send({ error: "agent_not_found" });
     if (agent.ownerMemberId !== member.id)
@@ -425,7 +575,11 @@ export async function createApp(
       member,
       agent,
       parsed.data.prompt,
-      isConnected(agent.id) ? "queued" : "waiting_for_agent",
+      demoMode && agent.status === "online"
+        ? "queued"
+        : isConnected(agent.id)
+          ? "queued"
+          : "waiting_for_agent",
     );
     broadcast();
     schedule();
@@ -449,7 +603,9 @@ export async function createApp(
       !db.reassignTask(
         (request.params as { id: string }).id,
         agent.id,
-        isConnected(agent.id) ? "queued" : "waiting_for_agent",
+        (demoMode && agent.status === "online") || isConnected(agent.id)
+          ? "queued"
+          : "waiting_for_agent",
       )
     ) {
       return reply.code(409).send({ error: "task_not_reassignable" });
@@ -495,7 +651,8 @@ export async function createApp(
     if (
       !db.retryTask(
         taskId,
-        agent?.status === "online" && isConnected(task.selectedAgentId)
+        agent?.status === "online" &&
+          (demoMode || isConnected(task.selectedAgentId))
           ? "queued"
           : "waiting_for_agent",
       )
@@ -527,6 +684,8 @@ export async function createApp(
   app.post("/api/tasks/:id/force-release", async (request, reply) => {
     const member = await authenticated(request, reply);
     if (!member) return;
+    if (demoMode)
+      return reply.code(403).send({ error: "demo_mode_endpoint_disabled" });
     if (!member.isAdmin)
       return reply.code(403).send({ error: "admin_required" });
     if ((request.body as { confirm?: unknown })?.confirm !== "FORCE_RELEASE")
@@ -562,7 +721,11 @@ export async function createApp(
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     });
-    streams.add(reply);
+    const rawSession = request.cookies[SESSION_COOKIE];
+    streams.set(reply, {
+      member,
+      sessionHash: demoMode || !rawSession ? null : hash(rawSession),
+    });
     reply.raw.write(
       `event: snapshot\ndata: ${JSON.stringify(db.snapshot(member))}\n\n`,
     );
@@ -574,6 +737,10 @@ export async function createApp(
   });
 
   app.get("/api/runner", { websocket: true }, (socket) => {
+    if (demoMode) {
+      socket.close(1008, "Demo mode does not accept Runner connections");
+      return;
+    }
     let registeredAgentId: string | null = null;
     socket.on("message", (raw) => {
       let data: unknown;
@@ -780,6 +947,7 @@ export async function createApp(
   heartbeatTimer.unref();
   app.addHook("onClose", async () => {
     closing = true;
+    if (demoTimer) clearTimeout(demoTimer);
     clearInterval(heartbeatTimer);
     for (const r of runners.values()) r.socket.close();
     db.close();
@@ -808,6 +976,10 @@ export async function createApp(
         ),
     );
   }
+
+  // Seeded demo work should start progressing as soon as the application is
+  // created; visitors should not need to mutate state to wake the scheduler.
+  schedule();
 
   return { app, db, bootstrapInvite, schedule };
 }

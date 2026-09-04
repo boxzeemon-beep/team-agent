@@ -146,7 +146,7 @@ End every early case study with the product scope used:
 
 ## 10. Call to action
 
-> Does your team have an informal “can you run your coding agent on this?” handoff? Read the [quickstart](https://github.com/boxzeemon-beep/team-agent#quickstart), review the [security model](https://github.com/boxzeemon-beep/team-agent/blob/main/docs/security.md), or open a Discussion describing your workflow.
+> Does your team have an informal “can you run your coding agent on this?” handoff? [Open the demo lobby](https://github.com/boxzeemon-beep/team-agent#open-the-demo-lobby), review the [security model](https://github.com/boxzeemon-beep/team-agent/blob/main/docs/security.md), or open a Discussion describing your workflow.
 
 ## 中文访谈提纲
 

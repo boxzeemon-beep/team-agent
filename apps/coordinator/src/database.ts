@@ -150,6 +150,250 @@ export class CoordinatorDatabase {
       .run(now());
   }
 
+  /**
+   * Installs a deterministic, disposable lobby for the public demo mode.
+   * The fixture is deliberately kept inside SQLite so the regular snapshot and
+   * task APIs exercise the same persistence path as a real coordinator.
+   */
+  seedDemo(): Member {
+    const stamp = now();
+    const memberId = "demo-member";
+    return this.transaction(() => {
+      const existingDemoMember = this.memberById(memberId);
+      if (!existingDemoMember) {
+        const applicationRows = [
+          "members",
+          "agents",
+          "tasks",
+          "messages",
+          "invites",
+          "pairing_tokens",
+          "coordinator_secrets",
+        ].reduce((total, table) => {
+          const row = this.sqlite
+            .prepare(`SELECT COUNT(*) AS count FROM ${table}`)
+            .get() as { count: number };
+          return total + Number(row.count);
+        }, 0);
+        const settings = this.getSettings();
+        const configured =
+          settings.projectName !== "Team Agent" ||
+          settings.repositoryUrl !== "" ||
+          settings.baseBranch !== "main" ||
+          settings.sharedBranch !== "team-agent" ||
+          settings.testCommand !== "";
+        if (applicationRows > 0 || configured) {
+          throw new Error(
+            "Demo mode requires an empty, dedicated coordinator database",
+          );
+        }
+      }
+
+      this.sqlite
+        .prepare(
+          `INSERT OR IGNORE INTO members
+           (id, name, is_admin, session_token_hash, created_at)
+           VALUES (?, '[DEMO] 指挥官', 1, NULL, ?)`,
+        )
+        .run(memberId, stamp);
+      if (!existingDemoMember)
+        this.sqlite
+          .prepare(
+            `UPDATE settings SET
+               project_name='[DEMO] Team Agent Playground',
+               repository_url='',
+               base_branch='main',
+               shared_branch='demo/internal-alpha',
+               test_command='pnpm test (simulated demo output)'
+             WHERE id=1`,
+          )
+          .run();
+
+      const fixtureTaskIds = [
+        "demo-task-running",
+        "demo-task-completed",
+        "demo-task-waiting",
+        "demo-task-attention",
+      ];
+      const fixtureMarks = fixtureTaskIds.map(() => "?").join(",");
+      const activeRows = this.sqlite
+        .prepare(
+          `SELECT id FROM tasks
+           WHERE status IN ('running','waiting_for_owner')
+             AND id NOT IN (${fixtureMarks})
+           ORDER BY created_at, id`,
+        )
+        .all(...fixtureTaskIds) as Array<{ id: string }>;
+      if (activeRows.length > 1) {
+        const duplicateIds = activeRows.slice(1).map(({ id }) => id);
+        const duplicateMarks = duplicateIds.map(() => "?").join(",");
+        this.sqlite
+          .prepare(
+            `UPDATE tasks
+             SET status='waiting_for_agent',
+                 progress='[DEMO] Waiting after coordinator restart',
+                 updated_at=?
+             WHERE id IN (${duplicateMarks})`,
+          )
+          .run(stamp, ...duplicateIds);
+      }
+      const hasUserActiveTask = activeRows.length > 0;
+      if (hasUserActiveTask)
+        this.sqlite
+          .prepare(
+            `UPDATE tasks
+             SET status='completed',
+                 progress='[DEMO] Completed',
+                 result=CASE WHEN result='' THEN '[DEMO RESULT] Initial lobby mission completed.' ELSE result END,
+                 updated_at=?
+             WHERE id='demo-task-running'
+               AND status IN ('running','waiting_for_owner')`,
+          )
+          .run(stamp);
+      const fixtureRunningTask = this.sqlite
+        .prepare(
+          "SELECT 1 FROM tasks WHERE id='demo-task-running' AND status IN ('running','waiting_for_owner')",
+        )
+        .get();
+
+      const agents = [
+        [
+          "demo-agent-aurora",
+          "Aurora · Demo Codex",
+          fixtureRunningTask || (!existingDemoMember && !hasUserActiveTask)
+            ? "busy"
+            : "online",
+        ],
+        ["demo-agent-rune", "Rune · Demo Codex", "online"],
+        ["demo-agent-echo", "Echo · Demo Codex", "offline"],
+        ["demo-agent-forge", "Forge · Demo Codex", "paused"],
+      ] as const;
+      for (const [id, displayName, status] of agents)
+        this.sqlite
+          .prepare(
+            `INSERT INTO agents
+             (id, owner_member_id, display_name, status,
+              last_context_message_sequence, last_seen_at, runner_token_hash,
+              device_id, created_at)
+             VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               display_name=excluded.display_name,
+               status=excluded.status,
+               last_seen_at=excluded.last_seen_at`,
+          )
+          .run(
+            id,
+            memberId,
+            displayName,
+            status,
+            stamp,
+            `demo-runner-${id}`,
+            `demo-device-${id}`,
+            stamp,
+          );
+
+      const tasks = [
+        {
+          id: "demo-task-running",
+          agentId: "demo-agent-aurora",
+          status: hasUserActiveTask ? "completed" : "running",
+          prompt: "[DEMO] 为大厅增加任务状态提示",
+          progress: "[DEMO] 正在模拟分析组件与运行测试",
+          result: "",
+          diff: "",
+          tests: "",
+          commit: "",
+          error: "",
+        },
+        {
+          id: "demo-task-completed",
+          agentId: "demo-agent-rune",
+          status: "completed",
+          prompt: "[DEMO] 优化 Agent 小队卡片",
+          progress: "[DEMO] Completed",
+          result: "[DEMO RESULT] 小队卡片已完成视觉整理。",
+          diff: "[DEMO DIFF — SIMULATED, NO FILES CHANGED]\n--- a/web/AgentCard.tsx\n+++ b/web/AgentCard.tsx\n@@ -1 +1 @@\n- status\n+ status and owner",
+          tests:
+            "[DEMO TESTS — SIMULATED]\nPASS AgentCard.demo.test.tsx (4 tests)",
+          commit: "DEMO-COMMIT-7A91C2",
+          error: "",
+        },
+        {
+          id: "demo-task-waiting",
+          agentId: "demo-agent-echo",
+          status: "waiting_for_agent",
+          prompt: "[DEMO] 为离线 Agent 保留任务",
+          progress: "[DEMO] Waiting for the selected Agent",
+          result: "",
+          diff: "",
+          tests: "",
+          commit: "",
+          error: "",
+        },
+        {
+          id: "demo-task-attention",
+          agentId: "demo-agent-forge",
+          status: "needs_attention",
+          prompt: "[DEMO] 检查发布前的视觉回归",
+          progress: "[DEMO] Needs attention",
+          result: "",
+          diff: "[DEMO DIFF — SIMULATED, NO FILES CHANGED]",
+          tests: "[DEMO TESTS — SIMULATED]\n1 illustrative check needs review",
+          commit: "",
+          error: "[DEMO] 示例：Agent 所有者需要确认后继续。",
+        },
+      ] as const;
+      if (existingDemoMember) return existingDemoMember;
+
+      for (const task of tasks) {
+        this.sqlite
+          .prepare(
+            `INSERT INTO tasks
+             (id, requester_member_id, selected_agent_id, status, prompt,
+              progress, result, diff, test_output, commit_sha, error,
+              created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               selected_agent_id=excluded.selected_agent_id,
+               status=excluded.status,
+               prompt=excluded.prompt,
+               progress=excluded.progress,
+               result=excluded.result,
+               diff=excluded.diff,
+               test_output=excluded.test_output,
+               commit_sha=excluded.commit_sha,
+               error=excluded.error,
+               assigned_through_message_sequence=0,
+               assignment_json='',
+               updated_at=excluded.updated_at`,
+          )
+          .run(
+            task.id,
+            memberId,
+            task.agentId,
+            task.status,
+            task.prompt,
+            task.progress,
+            task.result,
+            task.diff,
+            task.tests,
+            task.commit,
+            task.error,
+            stamp,
+            stamp,
+          );
+        this.sqlite
+          .prepare(
+            `INSERT OR IGNORE INTO messages
+             (id, task_id, member_id, member_name, role, content, created_at)
+             VALUES (?, ?, ?, '[DEMO] 指挥官', 'member', ?, ?)`,
+          )
+          .run(`message-${task.id}`, task.id, memberId, task.prompt, stamp);
+      }
+      return this.memberById(memberId) as Member;
+    });
+  }
+
   getOrCreateSecret(key: string, candidate: string): string {
     return this.transaction(() => {
       const existing = this.sqlite

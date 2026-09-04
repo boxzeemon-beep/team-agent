@@ -8,7 +8,7 @@ The long-term star goal is a distribution outcome, not the first operating metri
 
 - [ ] Run `pnpm demo:smoke`, `pnpm test`, `pnpm typecheck`, and `pnpm build` from the launch commit, and record its immutable SHA in the private launch log.
 - [ ] Confirm the Runner artifact, GHCR image, README recording, Discussions, and private vulnerability reporting.
-- [ ] Publish the v0.1.0 GitHub Discussion announcement and remain available for responses.
+- [ ] Publish the v0.2.0 GitHub Discussion announcement and remain available for responses.
 
 ### Day 1 — start with five warm teams
 

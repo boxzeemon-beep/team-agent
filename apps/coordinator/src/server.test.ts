@@ -1,12 +1,22 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RunnerServerMessage, Task } from "@team-agent/shared";
 import type { LightMyRequestResponse } from "fastify";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
-import { type CoordinatorApp, createApp } from "./server.js";
+import {
+  type CoordinatorApp,
+  type CoordinatorOptions,
+  createApp,
+} from "./server.js";
 
 interface Runtime extends CoordinatorApp {
   baseUrl: string;
@@ -15,7 +25,10 @@ interface Runtime extends CoordinatorApp {
 const runtimes: Runtime[] = [];
 const temporaryDirectories: string[] = [];
 
-async function startRuntime(databasePath?: string): Promise<Runtime> {
+async function startRuntime(
+  databasePath?: string,
+  options: CoordinatorOptions = {},
+): Promise<Runtime> {
   const directory = databasePath
     ? null
     : mkdtempSync(join(tmpdir(), "team-agent-coordinator-"));
@@ -26,6 +39,7 @@ async function startRuntime(databasePath?: string): Promise<Runtime> {
     publicUrl: "http://127.0.0.1:4310",
     webRoot: join(tmpdir(), "team-agent-web-assets-do-not-exist"),
     heartbeatCheckMs: 60_000,
+    ...options,
   });
   await coordinator.app.listen({ host: "127.0.0.1", port: 0 });
   const address = coordinator.app.server.address() as AddressInfo;
@@ -243,6 +257,41 @@ async function eventually(
   throw lastError;
 }
 
+async function nextSseSnapshot(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  state: { buffer: string },
+  timeoutMs = 2_000,
+): Promise<ReturnType<typeof JSON.parse>> {
+  const decoder = new TextDecoder();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const separator = state.buffer.indexOf("\n\n");
+    if (separator >= 0) {
+      const event = state.buffer.slice(0, separator);
+      state.buffer = state.buffer.slice(separator + 2);
+      const data = event
+        .split("\n")
+        .find((line) => line.startsWith("data: "))
+        ?.slice(6);
+      if (data) return JSON.parse(data);
+      continue;
+    }
+    const remaining = deadline - Date.now();
+    const chunk = await Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Timed out waiting for SSE event")),
+          remaining,
+        ),
+      ),
+    ]);
+    if (chunk.done) throw new Error("SSE stream closed");
+    state.buffer += decoder.decode(chunk.value, { stream: true });
+  }
+  throw new Error("Timed out waiting for SSE snapshot");
+}
+
 afterEach(async () => {
   while (runtimes.length) {
     const runtime = runtimes.pop();
@@ -266,8 +315,232 @@ describe("coordinator", () => {
     expect(response.json()).toEqual({
       status: "ok",
       service: "team-agent-coordinator",
-      version: "0.1.0",
+      version: "0.2.0",
     });
+  });
+
+  it("runs a credential-free demo lobby and simulates task completion", async () => {
+    const runtime = await startRuntime(undefined, {
+      demoMode: true,
+      demoStepDelayMs: 120,
+    });
+
+    const initial = await runtime.app.inject({
+      method: "GET",
+      url: "/api/snapshot",
+    });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json().me.name).toContain("[DEMO]");
+    expect(initial.json().settings.projectName).toContain("[DEMO]");
+    expect(initial.json().agents).toHaveLength(4);
+    expect(initial.json().tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: "running" }),
+        expect.objectContaining({ status: "completed" }),
+        expect.objectContaining({ status: "waiting_for_agent" }),
+        expect.objectContaining({ status: "needs_attention" }),
+      ]),
+    );
+
+    const seededRunningTask = initial
+      .json()
+      .tasks.find((task: { status: string }) => task.status === "running");
+    await eventually(() => {
+      expect(runtime.db.taskById(seededRunningTask.id)?.status).toBe(
+        "completed",
+      );
+    });
+
+    const onlineAgent = initial
+      .json()
+      .agents.find((agent: { status: string }) => agent.status === "online");
+    const created = await runtime.app.inject({
+      method: "POST",
+      url: "/api/tasks",
+      payload: {
+        agentId: onlineAgent.id,
+        prompt: "Verify the public demo flow",
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().status).toBe("queued");
+    const taskId = created.json().id as string;
+
+    await eventually(() => {
+      expect(runtime.db.taskById(taskId)?.status).toBe("running");
+    }, 1_000);
+    await eventually(() => {
+      const task = runtime.db.taskById(taskId);
+      expect(task?.status).toBe("completed");
+      expect(task?.result).toContain("[DEMO RESULT]");
+      expect(task?.diff).toContain("[DEMO DIFF — SIMULATED");
+      expect(task?.testOutput).toContain("[DEMO TESTS — SIMULATED]");
+      expect(task?.commitSha).toMatch(/^DEMO-COMMIT-/);
+    }, 1_000);
+  });
+
+  it("keeps demo Runner and live administration boundaries closed", async () => {
+    const runtime = await startRuntime(undefined, {
+      demoMode: true,
+      demoStepDelayMs: 10_000,
+    });
+    const initial = await runtime.app.inject({
+      method: "GET",
+      url: "/api/snapshot",
+    });
+    const agentId = initial.json().agents[0].id as string;
+    const requests = [
+      runtime.app.inject({ method: "POST", url: "/api/invites", payload: {} }),
+      runtime.app.inject({
+        method: "POST",
+        url: "/api/invites/claim",
+        payload: { token: "demo", name: "Demo" },
+      }),
+      runtime.app.inject({
+        method: "PUT",
+        url: "/api/settings",
+        payload: initial.json().settings,
+      }),
+      runtime.app.inject({
+        method: "POST",
+        url: "/api/agents/pair",
+        payload: { displayName: "Real Runner" },
+      }),
+      runtime.app.inject({
+        method: "POST",
+        url: `/api/agents/${agentId}/pause`,
+      }),
+      runtime.app.inject({
+        method: "POST",
+        url: `/api/agents/${agentId}/resume`,
+      }),
+      runtime.app.inject({
+        method: "POST",
+        url: `/api/agents/${agentId}/status`,
+        payload: { status: "online" },
+      }),
+      runtime.app.inject({ method: "POST", url: "/api/logout" }),
+      runtime.app.inject({
+        method: "POST",
+        url: "/api/tasks/demo-task-running/force-release",
+        payload: { confirm: "FORCE_RELEASE" },
+      }),
+    ];
+    for (const response of await Promise.all(requests)) {
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: "demo_mode_endpoint_disabled",
+      });
+    }
+
+    const socket = new WebSocket(
+      `${runtime.baseUrl.replace(/^http/, "ws")}/api/runner`,
+    );
+    const closed = await new Promise<{ code: number; reason: string }>(
+      (resolve, reject) => {
+        socket.once("close", (code, reason) =>
+          resolve({ code, reason: reason.toString() }),
+        );
+        socket.once("error", reject);
+      },
+    );
+    expect(closed).toEqual({
+      code: 1008,
+      reason: "Demo mode does not accept Runner connections",
+    });
+    expect(runtime.db.listAgents()).toHaveLength(4);
+  });
+
+  it("parks a demo task that is waiting for its owner without timer churn", async () => {
+    vi.useFakeTimers();
+    let runtime: CoordinatorApp | null = null;
+    try {
+      runtime = await createApp({
+        databasePath: ":memory:",
+        demoMode: true,
+        demoStepDelayMs: 100,
+        webRoot: join(tmpdir(), "team-agent-web-assets-do-not-exist"),
+        heartbeatCheckMs: 60_000,
+      });
+      runtime.db.sqlite
+        .prepare(
+          "UPDATE tasks SET status='waiting_for_owner' WHERE id='demo-task-running'",
+        )
+        .run();
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(runtime.db.taskById("demo-task-running")?.status).toBe(
+        "waiting_for_owner",
+      );
+      // The heartbeat interval remains; the demo scheduler has parked.
+      expect(vi.getTimerCount()).toBe(1);
+    } finally {
+      if (runtime) await runtime.app.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("broadcasts demo state changes over credential-free SSE", async () => {
+    const runtime = await startRuntime(undefined, {
+      demoMode: true,
+      demoStepDelayMs: 10_000,
+    });
+    const controller = new AbortController();
+    const response = await fetch(`${runtime.baseUrl}/api/stream`, {
+      signal: controller.signal,
+    });
+    expect(response.status).toBe(200);
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    if (!reader) throw new Error("Expected SSE response body");
+    const state = { buffer: "" };
+    const initial = await nextSseSnapshot(reader, state);
+    expect(initial.me.name).toContain("[DEMO]");
+    const onlineAgent = initial.agents.find(
+      (agent: { status: string }) => agent.status === "online",
+    );
+
+    const created = await runtime.app.inject({
+      method: "POST",
+      url: "/api/tasks",
+      payload: { agentId: onlineAgent.id, prompt: "SSE regression" },
+    });
+    const updated = await nextSseSnapshot(reader, state);
+    expect(updated.tasks).toContainEqual(
+      expect.objectContaining({ id: created.json().id, status: "queued" }),
+    );
+    controller.abort();
+  });
+
+  it("isolates demo and live databases under an explicit data directory", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "team-agent-data-root-"));
+    temporaryDirectories.push(directory);
+    const previous = process.env.TEAM_AGENT_DATA_DIR;
+    process.env.TEAM_AGENT_DATA_DIR = directory;
+    try {
+      const demo = await createApp({
+        demoMode: true,
+        demoStepDelayMs: 10_000,
+        webRoot: join(tmpdir(), "team-agent-web-assets-do-not-exist"),
+      });
+      runtimes.push({ ...demo, baseUrl: "" });
+      const live = await createApp({
+        demoMode: false,
+        webRoot: join(tmpdir(), "team-agent-web-assets-do-not-exist"),
+      });
+      runtimes.push({ ...live, baseUrl: "" });
+
+      expect(demo.db.countMembers()).toBeGreaterThan(0);
+      expect(live.db.countMembers()).toBe(0);
+      expect(live.bootstrapInvite).not.toBeNull();
+      expect(existsSync(join(directory, "demo", "coordinator.sqlite"))).toBe(
+        true,
+      );
+      expect(existsSync(join(directory, "coordinator.sqlite"))).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.TEAM_AGENT_DATA_DIR;
+      else process.env.TEAM_AGENT_DATA_DIR = previous;
+    }
   });
 
   it("returns a one-command Runner pairing flow from the public release", async () => {

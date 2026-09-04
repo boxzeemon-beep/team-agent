@@ -1,5 +1,31 @@
 # Five-minute local smoke demo
 
+## Public browser playground (no credentials)
+
+To open a populated Team Agent lobby without connecting Codex or a Git
+repository, run this single command from the repository root:
+
+```bash
+pnpm demo:playground
+```
+
+Then visit <http://127.0.0.1:4311>. The playground signs in as a demo member,
+seeds four clearly labelled demo Agents plus representative task states, and
+lets you submit work to an online Agent. Each submitted task progresses through
+`queued → running → completed` automatically. Its result, diff, test output,
+and commit identifier are explicitly marked as simulated demo data. Demo mode
+does not launch Codex and does not read, modify, commit, or push a Git
+repository. Its SQLite file is isolated under `.data/demo/` by default, or
+under `$TEAM_AGENT_DATA_DIR/demo/` when an explicit data root is configured.
+Runner pairing and real deployment-management endpoints are disabled in Demo
+Mode, so the playground cannot hand work to a local Runner.
+
+Remove `TEAM_AGENT_DEMO_MODE=1` to use the regular invitation, Runner, Codex,
+and Git workflow; the normal coordinator behavior is unchanged.
+
+The smoke demo below is a separate protocol-level check that exercises a local
+Git repository.
+
 This demo proves Team Agent's basic coordination loop on one computer, with no
 cloud account, public tunnel, remote repository, Docker, or Codex session.
 

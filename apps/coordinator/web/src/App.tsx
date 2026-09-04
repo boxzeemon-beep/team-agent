@@ -140,11 +140,13 @@ function ClaimView({
 function AgentCard({
   agent,
   mine,
+  managementEnabled,
   onToggle,
   busy,
 }: {
   agent: Agent;
   mine: boolean;
+  managementEnabled: boolean;
   onToggle: (agent: Agent) => void;
   busy: boolean;
 }) {
@@ -166,7 +168,7 @@ function AgentCard({
       </div>
       <div className="agent-actions">
         <Badge {...status} />
-        {mine && (
+        {mine && managementEnabled && (
           <button
             type="button"
             className="button button-quiet button-small"
@@ -854,6 +856,7 @@ function Dashboard({
   const [agentId, setAgentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const isDemo = snapshot.settings.projectName.startsWith("[DEMO]");
   const partyRef = useRef<HTMLElement>(null);
   const questsRef = useRef<HTMLElement>(null);
   const briefRef = useRef<HTMLTextAreaElement>(null);
@@ -1018,7 +1021,7 @@ function Dashboard({
         const agent = snapshot.agents[slot];
         if (agent) {
           if (agent.status !== "paused") setAgentId(agent.id);
-        } else {
+        } else if (!isDemo) {
           setPairOpen(true);
         }
         event.preventDefault();
@@ -1032,7 +1035,7 @@ function Dashboard({
         event.preventDefault();
         revealParty();
       }
-      if (event.code === "KeyC") {
+      if (event.code === "KeyC" && !isDemo) {
         event.preventDefault();
         setPairOpen(true);
       }
@@ -1040,7 +1043,7 @@ function Dashboard({
         event.preventDefault();
         revealQuests();
       }
-      if (event.code === "KeyG" && snapshot.me.isAdmin) {
+      if (event.code === "KeyG" && snapshot.me.isAdmin && !isDemo) {
         event.preventDefault();
         setAdminOpen(true);
       }
@@ -1050,6 +1053,7 @@ function Dashboard({
   }, [
     snapshot.agents,
     snapshot.me.isAdmin,
+    isDemo,
     pairOpen,
     adminOpen,
     revealParty,
@@ -1071,7 +1075,7 @@ function Dashboard({
             <span className="presence-dot" />
             {onlineCount} / {snapshot.agents.length} AGENTS 待命
           </div>
-          {snapshot.me.isAdmin && (
+          {snapshot.me.isAdmin && !isDemo && (
             <button
               type="button"
               className="button button-quiet"
@@ -1088,6 +1092,20 @@ function Dashboard({
         </div>
       </header>
 
+      {isDemo && (
+        <aside className="demo-banner" role="status">
+          <span className="demo-banner-badge">DEMO</span>
+          <div>
+            <strong>免凭据试玩大厅</strong>
+            <span className="demo-banner-copy">
+              任务进度、Diff、测试与 Commit
+              均为模拟结果；可自由发布任务、选择或重指派
+              Agent，体验完整协作流程。
+            </span>
+          </div>
+        </aside>
+      )}
+
       <section className="game-stage" aria-label="协作行动大厅">
         <div className="scene-vignette" aria-hidden="true" />
 
@@ -1102,16 +1120,24 @@ function Dashboard({
             <small>任务</small>
             <kbd>ALT Q</kbd>
           </button>
-          <button
-            type="button"
-            className="command-action command-right"
-            onClick={() => setPairOpen(true)}
-            aria-keyshortcuts="Alt+C"
-          >
-            <span>02</span>
-            <small>接入</small>
-            <kbd>ALT C</kbd>
-          </button>
+          {isDemo ? (
+            <span className="command-action command-right command-readonly">
+              <span>02</span>
+              <small>试玩</small>
+              <kbd>DEMO</kbd>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="command-action command-right"
+              onClick={() => setPairOpen(true)}
+              aria-keyshortcuts="Alt+C"
+            >
+              <span>02</span>
+              <small>接入</small>
+              <kbd>ALT C</kbd>
+            </button>
+          )}
           <button
             type="button"
             className="command-action command-bottom"
@@ -1156,10 +1182,12 @@ function Dashboard({
           <button
             type="button"
             onClick={() =>
-              snapshot.me.isAdmin ? setAdminOpen(true) : revealQuests()
+              snapshot.me.isAdmin && !isDemo
+                ? setAdminOpen(true)
+                : revealQuests()
             }
           >
-            {snapshot.me.isAdmin ? "项目配置" : "查看任务"} →
+            {snapshot.me.isAdmin && !isDemo ? "项目配置" : "查看任务"} →
           </button>
         </aside>
 
@@ -1216,7 +1244,11 @@ function Dashboard({
                 rows={2}
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
-                placeholder="描述要交给 Agent 完成的真实开发任务…"
+                placeholder={
+                  isDemo
+                    ? "输入一个任务，观看模拟 Agent 完成协作流程…"
+                    : "描述要交给 Agent 完成的真实开发任务…"
+                }
               />
             </label>
             <div className="launcher-footer">
@@ -1298,26 +1330,27 @@ function Dashboard({
                 <i aria-hidden="true" />
               </button>
             ))}
-            {["party-slot-a", "party-slot-b", "party-slot-c", "party-slot-d"]
-              .slice(snapshot.agents.length)
-              .map((slotId, index) => (
-                <button
-                  type="button"
-                  className="party-slot party-slot-empty"
-                  key={slotId}
-                  onClick={() => setPairOpen(true)}
-                  title="接入新的 Codex Agent"
-                  aria-label="接入新的 Codex Agent"
-                  aria-keyshortcuts={`Alt+${snapshot.agents.length + index + 1}`}
-                >
-                  <kbd>{snapshot.agents.length + index + 1}</kbd>
-                  <span className="slot-avatar">＋</span>
-                  <span className="slot-copy">
-                    <strong>接入 Agent</strong>
-                    <small>空闲小队席位</small>
-                  </span>
-                </button>
-              ))}
+            {!isDemo &&
+              ["party-slot-a", "party-slot-b", "party-slot-c", "party-slot-d"]
+                .slice(snapshot.agents.length)
+                .map((slotId, index) => (
+                  <button
+                    type="button"
+                    className="party-slot party-slot-empty"
+                    key={slotId}
+                    onClick={() => setPairOpen(true)}
+                    title="接入新的 Codex Agent"
+                    aria-label="接入新的 Codex Agent"
+                    aria-keyshortcuts={`Alt+${snapshot.agents.length + index + 1}`}
+                  >
+                    <kbd>{snapshot.agents.length + index + 1}</kbd>
+                    <span className="slot-avatar">＋</span>
+                    <span className="slot-copy">
+                      <strong>接入 Agent</strong>
+                      <small>空闲小队席位</small>
+                    </span>
+                  </button>
+                ))}
           </div>
         </fieldset>
 
@@ -1337,7 +1370,11 @@ function Dashboard({
           <div>
             <p className="eyebrow">OPERATIONS CENTER · 行动记录</p>
             <h1>{snapshot.settings.projectName}</h1>
-            <p>每项任务都继承同一份项目对话、代码状态与真实 Git 记录。</p>
+            <p>
+              {isDemo
+                ? "免凭据体验 Agent 借用、串行队列和行动战报；代码证据均为模拟展示。"
+                : "每项任务都继承同一份项目对话、代码状态与真实 Git 记录。"}
+            </p>
           </div>
           <div className="hero-summary">
             <div>
@@ -1362,13 +1399,15 @@ function Dashboard({
               <h2>执行小队</h2>
               <p>查看团队共享的 Codex，并选择下一项任务的执行 Agent。</p>
             </div>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => setPairOpen(true)}
-            >
-              ＋ 接入我的 Codex
-            </button>
+            {!isDemo && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setPairOpen(true)}
+              >
+                ＋ 接入我的 Codex
+              </button>
+            )}
           </div>
           {snapshot.agents.length ? (
             <div className="agent-grid">
@@ -1377,6 +1416,7 @@ function Dashboard({
                   key={agent.id}
                   agent={agent}
                   mine={agent.ownerMemberId === snapshot.me.id}
+                  managementEnabled={!isDemo}
                   onToggle={toggleAgent}
                   busy={busy}
                 />
@@ -1514,10 +1554,14 @@ function Dashboard({
       </main>
       <footer>
         <span>Team Agent · Joint Operations</span>
-        <span>行动项目：{snapshot.settings.repositoryUrl || "尚未配置"}</span>
+        <span>
+          {isDemo
+            ? "试玩环境 · 所有代码结果均为模拟展示"
+            : `行动项目：${snapshot.settings.repositoryUrl || "尚未配置"}`}
+        </span>
       </footer>
-      {pairOpen && <PairModal onClose={() => setPairOpen(false)} />}
-      {adminOpen && (
+      {pairOpen && !isDemo && <PairModal onClose={() => setPairOpen(false)} />}
+      {adminOpen && !isDemo && (
         <AdminModal
           snapshot={snapshot}
           onClose={() => setAdminOpen(false)}

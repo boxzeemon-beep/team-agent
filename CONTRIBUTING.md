@@ -30,9 +30,9 @@ checkout, use the development override:
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
-Override `TEAM_AGENT_IMAGE` and `TEAM_AGENT_PLATFORM` when testing a specific
-published image. Keep the values in `.env.example` and the defaults in
-`compose.yaml` aligned.
+Override `TEAM_AGENT_IMAGE` when testing a specific published image. Keep its
+value in `.env.example` and the default in `compose.yaml` aligned; the release
+image supports both `linux/amd64` and `linux/arm64`.
 
 ## Pull requests
 
