@@ -12,7 +12,7 @@ and inspect the response, diff, tests, and commit when it finishes.
 
 **Codex and Git credentials stay on the Agent owner's computer.**
 
-[▶ Open the demo lobby](#open-the-demo-lobby) ·
+[▶ Play the zero-install demo](https://boxzeemon-beep.github.io/team-agent/) ·
 [🚀 Deploy for your team](#deploy-for-your-team) ·
 [⭐ Star Team Agent](https://github.com/boxzeemon-beep/team-agent)
 
@@ -67,7 +67,9 @@ tests ran, and which commit was created.
 
 ## Open the demo lobby
 
-Run the populated tactical lobby without a Codex login or Git repository:
+**[Play the public browser demo →](https://boxzeemon-beep.github.io/team-agent/)** — no install, login, Coordinator, Codex, or Git repository required. All public-demo data and actions are clearly marked as simulated and run only in the browser.
+
+Or run the populated tactical lobby locally without a Codex login or Git repository:
 
 ```bash
 docker run --rm -p 127.0.0.1:4310:4310 -e TEAM_AGENT_DEMO_MODE=1 \
@@ -292,7 +294,7 @@ If Team Agent would help your team:
 - ⭐ [Star the repository](https://github.com/boxzeemon-beep/team-agent)
 - ▶ [Open the demo lobby](#open-the-demo-lobby)
 - 💬 [Tell us about your workflow](https://github.com/boxzeemon-beep/team-agent/discussions)
-- 🛠️ [Pick a contribution](CONTRIBUTING.md)
+- 🛠️ [Pick a good first issue](https://github.com/boxzeemon-beep/team-agent/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
 
 ## Join the first 20 design partners
 

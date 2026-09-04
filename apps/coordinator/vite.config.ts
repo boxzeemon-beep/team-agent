@@ -1,11 +1,12 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   root: "web",
+  base: mode === "pages" ? "/team-agent/" : "/",
   plugins: [react()],
   build: {
-    outDir: "../dist/web",
+    outDir: mode === "pages" ? "../dist/pages" : "../dist/web",
     emptyOutDir: true,
   },
   server: {
@@ -17,4 +18,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

@@ -18,6 +18,9 @@ import {
   useState,
 } from "react";
 import { ApiError, api, getSnapshot, json } from "./api.js";
+import { staticDemoResult, staticDemoSnapshot } from "./static-demo.js";
+
+const isStaticPublicDemo = import.meta.env.VITE_STATIC_DEMO === "1";
 
 const taskStatus: Record<TaskStatus, { label: string; tone: string }> = {
   queued: { label: "任务队列中", tone: "neutral" },
@@ -248,6 +251,7 @@ function TaskDetail({
   canRetry,
   isAdmin,
   onRefresh,
+  staticPublicDemo = false,
 }: {
   task: Task;
   agents: Agent[];
@@ -255,6 +259,7 @@ function TaskDetail({
   canRetry: boolean;
   isAdmin: boolean;
   onRefresh: () => Promise<void>;
+  staticPublicDemo?: boolean;
 }) {
   const [reply, setReply] = useState("");
   const [agentId, setAgentId] = useState(task.selectedAgentId);
@@ -500,8 +505,38 @@ function TaskDetail({
           </button>
         </div>
       )}
+      {staticPublicDemo && task.status === "completed" && (
+        <section className="demo-completion-cta" aria-label="试玩下一步">
+          <span className="demo-completion-kicker">
+            MISSION COMPLETE · 模拟任务完成
+          </span>
+          <h3>想把这个大厅接入你的真实团队？</h3>
+          <p>
+            Star 项目关注后续版本，或在本地部署 Coordinator 与
+            Runner，连接团队成员自己的 Codex 和 Git。
+          </p>
+          <div>
+            <a
+              className="button button-primary"
+              href="https://github.com/boxzeemon-beep/team-agent"
+              target="_blank"
+              rel="noreferrer"
+            >
+              ⭐ Star on GitHub
+            </a>
+            <a
+              className="button button-secondary"
+              href="https://github.com/boxzeemon-beep/team-agent#deploy-for-your-team"
+              target="_blank"
+              rel="noreferrer"
+            >
+              本地部署指南 →
+            </a>
+          </div>
+        </section>
+      )}
       {error && <div className="alert alert-error">{error}</div>}
-      {isTerminalTaskStatus(task.status) && (
+      {!staticPublicDemo && isTerminalTaskStatus(task.status) && (
         <form className="reply-form" onSubmit={sendReply}>
           <label>
             <span>补充任务线索</span>
@@ -839,9 +874,11 @@ function AdminModal({
 function Dashboard({
   initial,
   onUnauthorized,
+  staticPublicDemo = false,
 }: {
   initial: DashboardSnapshot;
   onUnauthorized: () => void;
+  staticPublicDemo?: boolean;
 }) {
   const [snapshot, setSnapshot] = useState(initial);
   const [selectedId, setSelectedId] = useState(() =>
@@ -860,19 +897,27 @@ function Dashboard({
   const partyRef = useRef<HTMLElement>(null);
   const questsRef = useRef<HTMLElement>(null);
   const briefRef = useRef<HTMLTextAreaElement>(null);
+  const simulationTimers = useRef<number[]>([]);
   const availableAgents = useMemo(
-    () => snapshot.agents.filter((agent) => agent.status !== "paused"),
-    [snapshot.agents],
+    () =>
+      snapshot.agents.filter((agent) =>
+        staticPublicDemo
+          ? agent.status === "online"
+          : agent.status !== "paused",
+      ),
+    [snapshot.agents, staticPublicDemo],
   );
 
   const refresh = useCallback(async () => {
+    if (staticPublicDemo) return;
     try {
       setSnapshot(await getSnapshot());
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) onUnauthorized();
     }
-  }, [onUnauthorized]);
+  }, [onUnauthorized, staticPublicDemo]);
   useEffect(() => {
+    if (staticPublicDemo) return;
     const stream = new EventSource("/api/stream");
     stream.onmessage = () => void refresh();
     stream.addEventListener("snapshot", () => void refresh());
@@ -881,7 +926,13 @@ function Dashboard({
       stream.close();
       clearInterval(backup);
     };
-  }, [refresh]);
+  }, [refresh, staticPublicDemo]);
+  useEffect(
+    () => () => {
+      for (const timer of simulationTimers.current) clearTimeout(timer);
+    },
+    [],
+  );
   useEffect(() => {
     if (availableAgents.some((agent) => agent.id === agentId)) return;
     setAgentId(
@@ -918,35 +969,135 @@ function Dashboard({
   const completionProgress = snapshot.tasks.length
     ? Math.round((completedCount / snapshot.tasks.length) * 100)
     : 0;
+  const hasActiveStaticDemoTask =
+    staticPublicDemo &&
+    snapshot.tasks.some(
+      (task) => task.status === "queued" || task.status === "running",
+    );
   const launchAgent = snapshot.agents.find((agent) => agent.id === agentId);
   const canLaunch = Boolean(
-    prompt.trim() && launchAgent && launchAgent.status !== "paused",
+    prompt.trim() &&
+      launchAgent &&
+      launchAgent.status !== "paused" &&
+      !hasActiveStaticDemoTask,
   );
-  const launchLabel = !prompt.trim()
-    ? "输入任务目标"
-    : !launchAgent || launchAgent.status === "paused"
-      ? "选择可用 Agent"
-      : launchAgent.status === "busy"
-        ? "加入任务队列"
-        : launchAgent.status === "offline"
-          ? "排队等待 Agent"
-          : "开始任务";
-  const launchHint = !prompt.trim()
-    ? "先描述要完成的开发目标"
-    : !launchAgent
-      ? "从右侧小队选择执行 Agent"
-      : launchAgent.status === "busy"
-        ? "当前任务结束后自动执行"
-        : launchAgent.status === "offline"
-          ? "Agent 连接后自动执行"
-          : launchAgent.status === "paused"
-            ? "该 Agent 当前暂停共享"
-            : "立即进入项目执行队列";
+  const launchLabel = hasActiveStaticDemoTask
+    ? "等待当前模拟任务"
+    : !prompt.trim()
+      ? "输入任务目标"
+      : !launchAgent || launchAgent.status === "paused"
+        ? "选择可用 Agent"
+        : launchAgent.status === "busy"
+          ? "加入任务队列"
+          : launchAgent.status === "offline"
+            ? "排队等待 Agent"
+            : "开始任务";
+  const launchHint = hasActiveStaticDemoTask
+    ? "试玩大厅保持单任务串行执行"
+    : !prompt.trim()
+      ? "先描述要完成的开发目标"
+      : !launchAgent
+        ? "从右侧小队选择执行 Agent"
+        : launchAgent.status === "busy"
+          ? "当前任务结束后自动执行"
+          : launchAgent.status === "offline"
+            ? "Agent 连接后自动执行"
+            : launchAgent.status === "paused"
+              ? "该 Agent 当前暂停共享"
+              : "立即进入项目执行队列";
 
   async function createTask(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    if (staticPublicDemo) {
+      const selectedAgent = snapshot.agents.find(
+        (agent) => agent.id === agentId,
+      );
+      const submittedPrompt = prompt.trim();
+      if (!selectedAgent || !submittedPrompt) {
+        setBusy(false);
+        return;
+      }
+      const createdAt = new Date().toISOString();
+      const id = `static-demo-${Date.now()}`;
+      const demoTask: Task = {
+        id,
+        requesterMemberId: snapshot.me.id,
+        requesterName: snapshot.me.name,
+        selectedAgentId: selectedAgent.id,
+        selectedAgentName: selectedAgent.displayName,
+        selectedAgentOwnerName: selectedAgent.ownerName,
+        status: "queued",
+        prompt: submittedPrompt,
+        progress: "[模拟进度] 任务已进入浏览器内的演示队列。",
+        result: "",
+        diff: "",
+        testOutput: "",
+        commitSha: "",
+        error: "",
+        assignedThroughMessageSequence: 0,
+        createdAt,
+        updatedAt: createdAt,
+        messages: [],
+      };
+      setSnapshot((current) => ({
+        ...current,
+        tasks: [demoTask, ...current.tasks],
+      }));
+      setPrompt("");
+      setSelectedId(id);
+      location.hash = `task-${id}`;
+      setBusy(false);
+
+      simulationTimers.current.push(
+        window.setTimeout(() => {
+          const updatedAt = new Date().toISOString();
+          setSnapshot((current) => ({
+            ...current,
+            agents: current.agents.map((agent) =>
+              agent.id === selectedAgent.id
+                ? { ...agent, status: "busy" }
+                : agent,
+            ),
+            tasks: current.tasks.map((task) =>
+              task.id === id
+                ? {
+                    ...task,
+                    status: "running",
+                    progress: "[模拟进度] 正在读取项目上下文并生成代码变更…",
+                    updatedAt,
+                  }
+                : task,
+            ),
+          }));
+        }, 1100),
+        window.setTimeout(() => {
+          const updatedAt = new Date().toISOString();
+          setSnapshot((current) => ({
+            ...current,
+            agents: current.agents.map((agent) =>
+              agent.id === selectedAgent.id
+                ? { ...agent, status: "online" }
+                : agent,
+            ),
+            tasks: current.tasks.map((task) =>
+              task.id === id
+                ? {
+                    ...task,
+                    status: "completed",
+                    progress:
+                      "[模拟进度] 演示流程完成；下方证据均为本地固定样例。",
+                    ...staticDemoResult,
+                    updatedAt,
+                  }
+                : task,
+            ),
+          }));
+        }, 3500),
+      );
+      return;
+    }
     try {
       const result = await api<{ task?: Task; id?: string } | Task>(
         "/api/tasks",
@@ -1098,9 +1249,9 @@ function Dashboard({
           <div>
             <strong>免凭据试玩大厅</strong>
             <span className="demo-banner-copy">
-              任务进度、Diff、测试与 Commit
-              均为模拟结果；可自由发布任务、选择或重指派
-              Agent，体验完整协作流程。
+              {staticPublicDemo
+                ? "纯浏览器静态演示：所有数据与操作均为模拟，不连接 Coordinator、API、Codex 或 Git。"
+                : "任务进度、Diff、测试与 Commit 均为模拟结果；可自由发布任务、选择或重指派 Agent，体验完整协作流程。"}
             </span>
           </div>
         </aside>
@@ -1313,7 +1464,10 @@ function Dashboard({
                 key={agent.id}
                 className={`party-slot ${agent.id === focusedAgent?.id ? "is-focused" : ""} party-slot-${agent.status}`}
                 onClick={() => setAgentId(agent.id)}
-                disabled={agent.status === "paused"}
+                disabled={
+                  agent.status === "paused" ||
+                  (staticPublicDemo && agent.status !== "online")
+                }
                 aria-pressed={agent.id === focusedAgent?.id}
                 aria-keyshortcuts={`Alt+${index + 1}`}
                 aria-label={`${agent.displayName}，所有者 ${agent.ownerName}，${agentStatus[agent.status].label}，快捷键 Alt+${index + 1}`}
@@ -1524,20 +1678,23 @@ function Dashboard({
                   task={selected}
                   agents={snapshot.agents}
                   canManage={
-                    snapshot.me.isAdmin ||
-                    selected.requesterMemberId === snapshot.me.id
+                    !staticPublicDemo &&
+                    (snapshot.me.isAdmin ||
+                      selected.requesterMemberId === snapshot.me.id)
                   }
                   canRetry={
-                    snapshot.me.isAdmin ||
-                    selected.requesterMemberId === snapshot.me.id ||
-                    snapshot.agents.some(
-                      (agent) =>
-                        agent.id === selected.selectedAgentId &&
-                        agent.ownerMemberId === snapshot.me.id,
-                    )
+                    !staticPublicDemo &&
+                    (snapshot.me.isAdmin ||
+                      selected.requesterMemberId === snapshot.me.id ||
+                      snapshot.agents.some(
+                        (agent) =>
+                          agent.id === selected.selectedAgentId &&
+                          agent.ownerMemberId === snapshot.me.id,
+                      ))
                   }
                   isAdmin={snapshot.me.isAdmin}
                   onRefresh={refresh}
+                  staticPublicDemo={staticPublicDemo}
                 />
               ) : (
                 <div className="empty-detail">选择一项任务查看行动战报</div>
@@ -1546,8 +1703,12 @@ function Dashboard({
           ) : (
             <div className="empty-state">
               <div>✓</div>
-              <h3>发布第一项真实任务</h3>
-              <p>写下目标、指派 Agent，所有进展与代码证据都会记录在这里。</p>
+              <h3>{isDemo ? "发布第一项模拟任务" : "发布第一项真实任务"}</h3>
+              <p>
+                {isDemo
+                  ? "写下任意目标并选择 Demo Agent，观察队列、执行与战报流程。"
+                  : "写下目标、指派 Agent，所有进展与代码证据都会记录在这里。"}
+              </p>
             </div>
           )}
         </section>
@@ -1582,6 +1743,7 @@ export function App() {
   const search = new URLSearchParams(location.search);
   const token = search.get("token") ?? search.get("invite") ?? "";
   const load = useCallback(async () => {
+    if (isStaticPublicDemo) return;
     setState({ kind: "loading" });
     try {
       setState({ kind: "ready", snapshot: await getSnapshot() });
@@ -1598,6 +1760,15 @@ export function App() {
   useEffect(() => {
     void load();
   }, [load]);
+  if (isStaticPublicDemo) {
+    return (
+      <Dashboard
+        initial={staticDemoSnapshot}
+        onUnauthorized={() => undefined}
+        staticPublicDemo
+      />
+    );
+  }
   if (state.kind === "loading")
     return (
       <main className="loading-screen">

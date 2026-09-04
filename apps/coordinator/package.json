@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -k -n server,web -c cyan,magenta \"tsx watch src/index.ts\" \"vite --host 127.0.0.1\"",
     "build": "vite build && tsup --config tsup.config.ts",
+    "build:pages": "vite build --mode pages",
     "start": "tsx src/index.ts",
     "start:built": "node dist/server/index.js",
     "typecheck": "tsc --noEmit"

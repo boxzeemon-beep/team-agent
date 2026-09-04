@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "build:pages": "pnpm --filter @team-agent/coordinator build:pages",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",

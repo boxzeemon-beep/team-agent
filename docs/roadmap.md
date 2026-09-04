@@ -15,7 +15,8 @@ This document describes direction, not a compatibility guarantee. Release scope 
 - [x] Managed Git clone, tests, commit, and push
 - [x] Progress, owner-waiting, diff, tests, and commit history
 - [x] SQLite and Runner restart recovery
-- [ ] Complete the public release checklist and publish versioned release notes
+- [x] Publish v0.2.0 release notes and versioned Coordinator and Runner artifacts
+- [ ] Repeat the full public release checklist on clean supported hosts
 
 ## Next: five-minute first task
 

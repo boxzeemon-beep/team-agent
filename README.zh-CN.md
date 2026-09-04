@@ -11,7 +11,7 @@
 
 **Codex 与 Git 凭据始终留在 Agent 所有者的电脑上。**
 
-[▶ 打开试玩大厅](#打开试玩大厅) ·
+[▶ 直接试玩公开网页版](https://boxzeemon-beep.github.io/team-agent/) ·
 [🚀 部署给团队使用](#部署给团队使用) ·
 [⭐ Star Team Agent](https://github.com/boxzeemon-beep/team-agent)
 
@@ -63,7 +63,9 @@ Codex 登录信息和 Git 凭据不会上传到 Coordinator。
 
 ## 打开试玩大厅
 
-无需 Codex 登录或 Git 仓库，即可运行带有预置内容的战术大厅：
+**[直接试玩公开网页版 →](https://boxzeemon-beep.github.io/team-agent/)** — 无需安装、登录、Coordinator、Codex 或 Git 仓库。公开演示中的数据与操作均明确标记为模拟，并且只在浏览器中运行。
+
+也可以在本地运行带有预置内容的战术大厅，无需 Codex 登录或 Git 仓库：
 
 ```bash
 docker run --rm -p 127.0.0.1:4310:4310 -e TEAM_AGENT_DEMO_MODE=1 \
@@ -261,7 +263,7 @@ pnpm build
 - ⭐ [Star 这个仓库](https://github.com/boxzeemon-beep/team-agent)
 - ▶ [打开试玩大厅](#打开试玩大厅)
 - 💬 [告诉我们你的使用场景](https://github.com/boxzeemon-beep/team-agent/discussions)
-- 🛠️ [选择一个贡献方向](CONTRIBUTING.md)
+- 🛠️ [领取一个 good first issue](https://github.com/boxzeemon-beep/team-agent/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
 
 ## 加入首批 20 个设计伙伴团队
 

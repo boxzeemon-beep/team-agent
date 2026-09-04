@@ -345,6 +345,44 @@ input::placeholder {
   font-size: 0.72rem;
 }
 
+.demo-completion-cta {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(245, 191, 80, 0.48);
+  border-radius: 0.8rem;
+  background:
+    linear-gradient(135deg, rgba(245, 191, 80, 0.12), transparent 58%),
+    rgba(5, 17, 25, 0.86);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.demo-completion-cta .demo-completion-kicker {
+  color: #f5bf50;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.demo-completion-cta h3 {
+  margin: 0.45rem 0 0.35rem;
+}
+
+.demo-completion-cta p {
+  max-width: 48rem;
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.demo-completion-cta > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.demo-completion-cta a {
+  text-decoration: none;
+}
+
 .brand {
   gap: 12px;
 }

@@ -3,6 +3,11 @@
 Thanks for helping teams share coding agents while keeping credentials with
 their owners.
 
+**New to the project?** Start with the scoped
+[`good first issue`](https://github.com/boxzeemon-beep/team-agent/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
+list. Each task includes acceptance criteria and likely files; leave a comment
+before starting so contributors do not duplicate work.
+
 ## Before you start
 
 - Use [GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions)
@@ -49,4 +54,6 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 ---
 
 中文说明：默认 `compose.yaml` 会拉取固定版本的 GHCR 镜像；从当前源码构建容器时，请叠加 `compose.dev.yaml`。功能变更请同时补充测试与中英文文档；开放式产品讨论请使用
-[GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions)，可复现的问题请提交 Issue。
+[GitHub Discussions](https://github.com/boxzeemon-beep/team-agent/discussions)，可复现的问题请提交 Issue；首次贡献可从
+[`good first issue`](https://github.com/boxzeemon-beep/team-agent/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
+列表开始。
