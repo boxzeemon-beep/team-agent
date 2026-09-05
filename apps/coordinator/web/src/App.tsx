@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import { ApiError, api, getSnapshot, json } from "./api.js";
+import { useCopyFeedback } from "./copy-feedback.js";
 import { staticDemoResult, staticDemoSnapshot } from "./static-demo.js";
 
 const isStaticPublicDemo = import.meta.env.VITE_STATIC_DEMO === "1";
@@ -72,6 +73,50 @@ function Badge({ label, tone }: { label: string; tone: string }) {
 
 function Spinner() {
   return <span className="spinner" aria-hidden="true" />;
+}
+
+function CopyButton({
+  text,
+  label,
+  copiedLabel = "已复制",
+  errorLabel = "复制失败",
+  className,
+  title,
+  ariaLabel,
+}: {
+  text: string | (() => string);
+  label: string;
+  copiedLabel?: string;
+  errorLabel?: string;
+  className?: string;
+  title?: string;
+  ariaLabel?: string;
+}) {
+  const { status, copy } = useCopyFeedback();
+  return (
+    <>
+      <button
+        type="button"
+        className={className}
+        title={title}
+        aria-label={ariaLabel}
+        onClick={() => void copy(typeof text === "function" ? text() : text)}
+      >
+        {status === "copied" ? copiedLabel : label}
+      </button>
+      <span
+        className={status === "error" ? "copy-feedback" : "sr-only"}
+        role="status"
+        aria-live="polite"
+      >
+        {status === "copied"
+          ? copiedLabel
+          : status === "error"
+            ? errorLabel
+            : ""}
+      </span>
+    </>
+  );
 }
 
 function ClaimView({
@@ -365,19 +410,14 @@ function TaskDetail({
                 取消任务
               </button>
             )}
-          <button
-            type="button"
+          <CopyButton
             className="icon-button"
-            onClick={() =>
-              navigator.clipboard.writeText(
-                `${location.href.split("#")[0]}#task-${task.id}`,
-              )
-            }
             title="复制任务链接"
-            aria-label="复制任务链接"
-          >
-            ↗
-          </button>
+            ariaLabel="复制任务链接"
+            label="↗"
+            copiedLabel="✓"
+            text={() => `${location.href.split("#")[0]}#task-${task.id}`}
+          />
         </div>
       </header>
       <div className="detail-facts">
@@ -497,12 +537,7 @@ function TaskDetail({
         <div className="commit-row">
           <span>任务提交 · Commit</span>
           <code>{task.commitSha}</code>
-          <button
-            type="button"
-            onClick={() => navigator.clipboard.writeText(task.commitSha)}
-          >
-            复制
-          </button>
+          <CopyButton label="复制" text={task.commitSha} />
         </div>
       )}
       {staticPublicDemo && task.status === "completed" && (
@@ -650,7 +685,6 @@ function PairModal({ onClose }: { onClose: () => void }) {
   const [pairing, setPairing] = useState<PairingResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
   async function create(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -668,12 +702,6 @@ function PairModal({ onClose }: { onClose: () => void }) {
       setBusy(false);
     }
   }
-  async function copy() {
-    if (!pairing) return;
-    await navigator.clipboard.writeText(pairing.command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  }
   return (
     <Modal title="接入我的 Codex Agent" onClose={onClose}>
       {pairing ? (
@@ -688,13 +716,11 @@ function PairModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="command-box">
             <code>{pairing.command}</code>
-            <button
-              type="button"
+            <CopyButton
               className="button button-secondary"
-              onClick={copy}
-            >
-              {copied ? "已复制" : "复制命令"}
-            </button>
+              label="复制命令"
+              text={pairing.command}
+            />
           </div>
           <p className="muted small">
             命令有效期至 {formatTime(pairing.expiresAt)}。Runner
@@ -780,13 +806,11 @@ function AdminModal({
         {invite ? (
           <div className="invite-result">
             <input readOnly value={invite.inviteUrl} />
-            <button
-              type="button"
+            <CopyButton
               className="button button-secondary"
-              onClick={() => navigator.clipboard.writeText(invite.inviteUrl)}
-            >
-              复制链接
-            </button>
+              label="复制链接"
+              text={invite.inviteUrl}
+            />
             <small>有效期至 {formatTime(invite.expiresAt)}</small>
           </div>
         ) : (
