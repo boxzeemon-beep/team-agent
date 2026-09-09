@@ -1,8 +1,79 @@
+# Team Agent — goal-and-acceptance workbench
+
+Delivery evidence and remaining limits: [2026-09-09 validation record](docs/delivery.md).
+
+**The `main` source includes the goal-and-acceptance workbench.** Describe an
+outcome, provide context and acceptance criteria, then select a teammate's Agent.
+A verified goal runs real project tests and a fresh read-only Codex review before
+publication; fixable failures return to implementation within a 1–3 round limit.
+Try the **[browser workbench on GitHub Pages](https://boxzeemon-beep.github.io/team-agent/)**,
+or run the same simulation locally. The historical screenshots and videos below
+still show the original v0.2.0 interface.
+
+This update covers source and Pages. It does not create a version tag or update
+the Docker images: `:0.2.0` and `:latest` still contain the original release.
+Use current `main` source or build it yourself for the new workbench and Runner.
+
+From this source checkout, use Node.js 22.5+ and pnpm 11:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm demo:browser
+```
+
+Open **[the local workbench](http://127.0.0.1:4321/team-agent/)**. The browser
+simulation starts with six sample tasks. The keyboard-accessibility example
+contains a failed first review and a passing second review. The API-retry example
+is blocked at its one-round limit: retrying preserves that limit. Create a new
+two-round goal to watch the complete simulated revision cycle. Task details also
+offer file-by-file diffs, raw test records, feedback, and Markdown export.
+
+**The browser preview does not call Codex, modify a repository, or run tests.**
+Its examples and results are simulated. Real execution still uses the Coordinator
+and a paired Runner on the Agent owner's computer.
+
+The isolated real-Codex smoke attempt completed implementation and project tests,
+but network timeouts prevented the independent review from finishing. It ended
+**blocked**, without publishing code. A complete real-model acceptance-and-push
+cycle has not yet been demonstrated; see the [recorded evidence](docs/delivery.md#真实-codex-尝试实现成功完整验收未通过).
+
+### Two execution modes
+
+| Mode | Agreement and completion |
+| --- | --- |
+| Verified goal | Context, 1–12 unique acceptance criteria and a 1–3 round limit. A configured project test command is required. Every criterion must pass a fresh read-only review of the tested tree, with no unresolved issues, before Git commit and push. |
+| Direct task | The existing implement → configured tests → commit/push workflow. It does not produce an independent per-criterion acceptance verdict. |
+
+Implementation and review use separate Codex sessions on the **same selected
+Runner**. The review session is read-only and cannot approve write escalation.
+Unverifiable evidence, a failed final review, a changed reviewed tree, or an
+exhausted round budget leaves the goal needing attention; a completed model turn
+alone cannot authorize publication. Code writes remain serialized per project.
+
+Use task feedback to prepare a **new editable goal draft** with the source task,
+previous result, and context. This does not silently submit another job or inherit
+the old acceptance verdict. Retry instead keeps the same agreed goal, creates a
+new run ID and archives earlier evidence. Reconnection restores the existing run
+and frozen assignment. Old Runners show an explicit `goal-workflow-v1` upgrade
+requirement for verified goals while remaining compatible with direct tasks.
+
+The product direction is informed by [Anthropic's team workflow discussion](docs/claude-team-research.md);
+this implementation continues to execute through Codex, not a Claude backend.
+
+[Workbench guide, architecture, and validation](docs/workbench.md) ·
+[简体中文](README.zh-CN.md) · [Deployment guide](#deploy-for-your-team)
+
+---
+
+The artwork and video below document the original v0.2.0 tactical lobby. The
+public Pages link opens the browser workbench. Pinned release commands still run
+v0.2.0; source commands run whichever branch you have checked out.
+
 <p align="center">
   <img src="docs/assets/social-preview.png" alt="Team Agent — the multiplayer lobby for coding agents" width="100%" />
 </p>
 
-# Team Agent
+## Team workflow
 
 **The multiplayer lobby for your team's coding agents.**
 
@@ -12,7 +83,7 @@ and inspect the response, diff, tests, and commit when it finishes.
 
 **Codex and Git credentials stay on the Agent owner's computer.**
 
-[▶ Play the zero-install demo](https://boxzeemon-beep.github.io/team-agent/) ·
+[▶ Open the browser workbench](https://boxzeemon-beep.github.io/team-agent/) ·
 [🚀 Deploy for your team](#deploy-for-your-team) ·
 [⭐ Star Team Agent](https://github.com/boxzeemon-beep/team-agent)
 
@@ -23,11 +94,11 @@ and inspect the response, diff, tests, and commit when it finishes.
 
 [简体中文](README.zh-CN.md) · [Tactical lobby](docs/tactical-lobby-experience.md) · [Architecture](docs/architecture.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-![Team Agent demo: choose a teammate's Agent, follow execution, and inspect the result](docs/assets/team-agent-demo.gif)
+![Historical v0.2.0 tactical lobby: choose an Agent and inspect a simulated result](docs/assets/team-agent-demo.gif)
 
 **Pick your squad → launch a task → watch it work → review the evidence**
 
-_[Watch the MP4](docs/assets/team-agent-demo.mp4) · [See every workflow state](docs/quickstart-demo.md). Released tactical UI; task evidence is clearly labelled as simulated._
+_[Watch the historical MP4](docs/assets/team-agent-demo.mp4) · [Original workflow guide](docs/quickstart-demo.md). These assets show the v0.2.0 tactical UI; use the Pages demo for the current workbench. Task evidence in these assets is simulated._
 
 ## Understand Team Agent in 30 seconds
 
@@ -65,11 +136,11 @@ project writes remain serialized by one project-wide execution lock.
 The team sees who requested the task, which Agent ran it, what changed, which
 tests ran, and which commit was created.
 
-## Open the demo lobby
+## Open the browser demo
 
-**[Play the public browser demo →](https://boxzeemon-beep.github.io/team-agent/)** — no install, login, Coordinator, Codex, or Git repository required. All public-demo data and actions are clearly marked as simulated and run only in the browser.
+**[Open the public browser workbench →](https://boxzeemon-beep.github.io/team-agent/)** — no install, login, Coordinator, Codex, or Git repository required. Explore goals, bounded revision, per-criterion reviews, feedback drafts and evidence export. All data and actions are simulated and run only in the browser. Pages is not a hosted Coordinator and cannot pair a real Runner.
 
-Or run the populated tactical lobby locally without a Codex login or Git repository:
+For the historical v0.2.0 tactical lobby, run its pinned image locally without a Codex login or Git repository:
 
 ```bash
 docker run --rm -p 127.0.0.1:4310:4310 -e TEAM_AGENT_DEMO_MODE=1 \
@@ -154,6 +225,10 @@ does not build the source tree. Docker selects the published `linux/amd64` or
 `linux/arm64` image for the current host. Set `TEAM_AGENT_IMAGE` in `.env` when
 pinning another published version.
 
+This image, and the `:latest` image, still contain v0.2.0. To deploy the new
+workbench from `main`, use the source-build Compose override below or the
+non-Docker source commands. This source/Pages update does not publish a new image.
+
 Set `TEAM_AGENT_PUBLIC_URL` in `.env` to the HTTPS URL your team will use. Docker Compose publishes port `4310`; restrict that port to your private network or host firewall. With Tailscale Serve:
 
 ```bash
@@ -170,9 +245,12 @@ override explicitly:
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
-For source development without Docker, use Node.js 22.5+ and pnpm 11, then run
-`pnpm coordinator` or `pnpm coordinator:built`; the source process listens on
-`127.0.0.1:4310` by default.
+For source development without Docker, use Node.js 22.5+ and pnpm 11. Install with
+`pnpm install --frozen-lockfile`, then use `pnpm coordinator:dev` for the development
+server and web UI at `http://127.0.0.1:4311`. For a production build, run `pnpm build`
+followed by `pnpm coordinator:built`. The Coordinator listens on `127.0.0.1:4310`
+by default. Running `pnpm coordinator` starts only the backend; build the web assets
+first if it should serve the UI as well.
 
 ### 2. Configure a project
 
@@ -182,20 +260,32 @@ Claim the administrator invite in a browser, then set:
 - Git repository URL;
 - base branch;
 - shared working branch;
-- optional test command.
+- test command (required for verified goals; optional for direct tasks).
 
 Generate one invite per teammate from the project page.
 
 ### 3. Pair a Runner
 
-On the Agent owner's computer, open the project and click **Contribute my Codex**. The page generates a single-use command in this form:
+For the new workbench, use a current `main` checkout on the Agent owner's
+computer and click **Connect Agent** in the web UI. Install and build the source,
+then run the generated one-time pairing command from that checkout:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "Alex's Codex"
+```
+
+The current Runner supports `goal-workflow-v1`, which verified goals require.
+The latest GitHub Release Runner remains v0.2.0 and does not gain this capability
+from a `main` or Pages update. For the older release workflow, its command is:
 
 ```bash
 npx --yes --package=https://github.com/boxzeemon-beep/team-agent/releases/latest/download/team-agent-runner.tgz \
   team-agent runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "Alex's Codex"
 ```
 
-The command runs the latest GitHub Release artifact directly and does not assume that an npm package has been published. For a persistent global command, use `scripts/runner-install.sh` or `scripts/runner-install.ps1`, then verify the host with `team-agent doctor --coordinator "https://COORDINATOR.example"`. Contributors working from a source checkout can use `pnpm runner -- ...` with the same options.
+The release command runs the latest GitHub Release artifact directly and does not assume that an npm package has been published. For a persistent global command for that release, use `scripts/runner-install.sh` or `scripts/runner-install.ps1`, then verify the host with `team-agent doctor --coordinator "https://COORDINATOR.example"`. Use the source workflow above for verified goals.
 
 The pairing token is single-use. The Runner stores its device identity, Codex thread IDs, and managed clones under `~/.team-agent/runner/` unless `--data-dir` is set. Restart it later with the same Coordinator, name, and data directory, but without `--pair`.
 

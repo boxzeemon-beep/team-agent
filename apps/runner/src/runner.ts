@@ -3,11 +3,17 @@ import type {
   RunnerServerMessage,
   TaskAssignment,
 } from "@team-agent/shared";
-import { runnerTextLimits, truncateText } from "@team-agent/shared";
+import {
+  canCompleteGoal,
+  GOAL_WORKFLOW_CAPABILITY,
+  runnerTextLimits,
+  truncateText,
+} from "@team-agent/shared";
 import WebSocket from "ws";
 import { CodexAppServerClient } from "./codex-client.js";
 import { type CliOptions, runnerWebSocketUrl, StateStore } from "./config.js";
 import { GitWorkspace, type PreparedRepository } from "./git.js";
+import { executeGoal } from "./goal-workflow.js";
 
 export class TeamAgentRunner {
   private readonly store: StateStore;
@@ -72,6 +78,8 @@ export class TeamAgentRunner {
     }
     await this.store.update((state) => {
       delete state.activeTaskId;
+      delete state.activeRunId;
+      state.goalCheckpoints = {};
     });
   }
 
@@ -112,6 +120,7 @@ export class TeamAgentRunner {
             : { pairingToken: this.options.pair }),
           deviceId: state.deviceId,
           displayName: this.options.name,
+          capabilities: [GOAL_WORKFLOW_CAPABILITY],
           ...(state.activeTaskId ? { activeTaskId: state.activeTaskId } : {}),
         });
       });
@@ -171,14 +180,28 @@ export class TeamAgentRunner {
   }
 
   private async acceptAssignment(assignment: TaskAssignment): Promise<void> {
-    const cached = this.store.get().completedTasks[assignment.taskId];
-    if (cached) {
+    const key = assignmentCacheKey(assignment);
+    const checkpoint = this.store.get().goalCheckpoints[key];
+    const cached = this.store.get().completedTasks[key];
+    if (
+      cached &&
+      (assignment.brief?.mode !== "verified" ||
+        (checkpoint?.workflow.phase === "completed" &&
+          canCompleteGoal(assignment.brief, checkpoint.workflow)))
+    ) {
       console.log(`Task ${assignment.taskId}: replaying cached completion`);
+      if (checkpoint && assignment.runId)
+        this.send({
+          type: "task.workflow",
+          taskId: assignment.taskId,
+          runId: assignment.runId,
+          workflow: checkpoint.workflow,
+        });
       this.send(cached);
       return;
     }
     if (this.activeAssignment) {
-      if (this.activeAssignment.taskId !== assignment.taskId) {
+      if (assignmentCacheKey(this.activeAssignment) !== key) {
         console.error(
           `Ignored task ${assignment.taskId}: already working on ${this.activeAssignment.taskId}`,
         );
@@ -190,6 +213,7 @@ export class TeamAgentRunner {
       this.send({
         type: "task.needs_attention",
         taskId: assignment.taskId,
+        ...(assignment.runId ? { runId: assignment.runId } : {}),
         message: `Managed workspace is preserved for unfinished task ${persistedTaskId}. Retry that task or explicitly run --reset-managed before assigning ${assignment.taskId}.`,
         diff: "",
         testOutput: "",
@@ -199,13 +223,18 @@ export class TeamAgentRunner {
     this.activeAssignment = assignment;
     await this.store.update((state) => {
       state.activeTaskId = assignment.taskId;
+      if (assignment.runId) state.activeRunId = assignment.runId;
+      else delete state.activeRunId;
     });
     void this.execute(assignment, persistedTaskId === assignment.taskId).then(
       () => {
         // Terminal messages normally clear this before transport so a newly
         // assigned task from the same Coordinator connection is accepted. The
         // guard prevents an older completion callback from clearing a newer task.
-        if (this.activeAssignment?.taskId === assignment.taskId)
+        if (
+          this.activeAssignment &&
+          assignmentCacheKey(this.activeAssignment) === key
+        )
           this.activeAssignment = undefined;
       },
     );
@@ -216,6 +245,13 @@ export class TeamAgentRunner {
     recovering: boolean,
   ): Promise<boolean> {
     const projectKey = this.store.projectKey(assignment.settings.repositoryUrl);
+    const key = assignmentCacheKey(assignment);
+    const checkpoint = this.store.get().goalCheckpoints[key];
+    const preservedGoal =
+      checkpoint ??
+      Object.values(this.store.get().goalCheckpoints).findLast(
+        (value) => value.taskId === assignment.taskId,
+      );
     let repository: PreparedRepository | undefined;
     let testOutput = "";
     try {
@@ -228,8 +264,60 @@ export class TeamAgentRunner {
       );
       repository = await this.git.prepare(projectKey, assignment.settings, {
         ...(recovering ? { recoverTaskId: assignment.taskId } : {}),
+        ...(recovering && assignment.brief?.mode === "verified" && preservedGoal
+          ? { recoverBaselineSha: preservedGoal.baselineSha }
+          : {}),
       });
       const project = this.store.get().projects[projectKey] ?? {};
+      if (assignment.brief?.mode === "verified") {
+        const finished = await executeGoal(
+          assignment,
+          repository,
+          buildPrompt(assignment, repository.baselineSha),
+          {
+            git: this.git,
+            codex: this.codex,
+            persist: async (value) => {
+              await this.store.update((state) => {
+                state.goalCheckpoints[key] = value;
+              });
+            },
+            onWorkflow: (workflow) =>
+              this.send({
+                type: "task.workflow",
+                taskId: assignment.taskId,
+                runId: assignment.runId as string,
+                workflow,
+              }),
+            callbacks: {
+              onProgress: (message) =>
+                this.progress(assignment.taskId, message, assignment.runId),
+              onWaitingOwner: (message) =>
+                this.send({
+                  type: "task.waiting_owner",
+                  taskId: assignment.taskId,
+                  ...(assignment.runId ? { runId: assignment.runId } : {}),
+                  message,
+                }),
+            },
+          },
+          checkpoint,
+        );
+        const complete: Extract<
+          RunnerClientMessage,
+          { type: "task.complete" }
+        > = {
+          type: "task.complete",
+          taskId: assignment.taskId,
+          ...(assignment.runId ? { runId: assignment.runId } : {}),
+          ...finished,
+          contextThroughSequence: assignment.contextThroughSequence,
+        };
+        await this.cacheCompletion(key, complete);
+        await this.finishLocalCompletion(assignment.taskId);
+        this.send(complete);
+        return true;
+      }
       if (repository.taskCommitSha) {
         this.progress(
           assignment.taskId,
@@ -248,13 +336,14 @@ export class TeamAgentRunner {
         > = {
           type: "task.complete",
           taskId: assignment.taskId,
+          ...(assignment.runId ? { runId: assignment.runId } : {}),
           result: "Recovered and published the preserved task commit.",
           diff: finished.diff,
           testOutput: finished.testOutput,
           commitSha: finished.commitSha,
           contextThroughSequence: assignment.contextThroughSequence,
         };
-        await this.cacheCompletion(assignment.taskId, complete);
+        await this.cacheCompletion(key, complete);
         await this.finishLocalCompletion(assignment.taskId);
         this.send(complete);
         return true;
@@ -284,6 +373,7 @@ export class TeamAgentRunner {
             this.send({
               type: "task.waiting_owner",
               taskId: assignment.taskId,
+              ...(assignment.runId ? { runId: assignment.runId } : {}),
               message,
             });
           },
@@ -311,13 +401,14 @@ export class TeamAgentRunner {
         {
           type: "task.complete",
           taskId: assignment.taskId,
+          ...(assignment.runId ? { runId: assignment.runId } : {}),
           result: result.text || "Codex completed the task.",
           diff: finished.diff,
           testOutput: finished.testOutput,
           commitSha: finished.commitSha,
           contextThroughSequence: assignment.contextThroughSequence,
         };
-      await this.cacheCompletion(assignment.taskId, complete);
+      await this.cacheCompletion(key, complete);
       await this.finishLocalCompletion(assignment.taskId);
       this.send(complete);
       console.log(
@@ -336,6 +427,7 @@ export class TeamAgentRunner {
       this.send({
         type: "task.needs_attention",
         taskId: assignment.taskId,
+        ...(assignment.runId ? { runId: assignment.runId } : {}),
         message,
         diff,
         testOutput,
@@ -347,7 +439,10 @@ export class TeamAgentRunner {
 
   private async finishLocalCompletion(taskId: string): Promise<void> {
     await this.store.update((state) => {
-      if (state.activeTaskId === taskId) delete state.activeTaskId;
+      if (state.activeTaskId === taskId) {
+        delete state.activeTaskId;
+        delete state.activeRunId;
+      }
     });
     if (this.activeAssignment?.taskId === taskId)
       this.activeAssignment = undefined;
@@ -369,9 +464,19 @@ export class TeamAgentRunner {
     });
   }
 
-  private progress(taskId: string, message: string): void {
+  private progress(taskId: string, message: string, runId?: string): void {
     console.log(`Task ${taskId}: ${message}`);
-    this.send({ type: "task.progress", taskId, message });
+    const currentRun =
+      runId ??
+      (this.activeAssignment?.taskId === taskId
+        ? this.activeAssignment.runId
+        : undefined);
+    this.send({
+      type: "task.progress",
+      taskId,
+      ...(currentRun ? { runId: currentRun } : {}),
+      message,
+    });
   }
 
   private send(message: RunnerClientMessage): void {
@@ -393,6 +498,15 @@ export class TeamAgentRunner {
     this.queuedMessages = [];
     for (const message of queued) this.send(message);
   }
+}
+
+/** A retry is a new execution and must never replay a previous run's receipt. */
+export function assignmentCacheKey(
+  assignment: Pick<TaskAssignment, "taskId" | "runId">,
+): string {
+  return assignment.runId
+    ? `${assignment.taskId}:${assignment.runId}`
+    : assignment.taskId;
 }
 
 export function boundRunnerMessage(

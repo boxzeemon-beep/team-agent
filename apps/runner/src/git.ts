@@ -12,6 +12,16 @@ export interface PreparedRepository {
 
 export interface PrepareOptions {
   recoverTaskId?: string;
+  recoverBaselineSha?: string;
+}
+
+export interface PublishDetails {
+  taskId: string;
+  requester: string;
+  agent: string;
+  sharedBranch: string;
+  expectedTreeSha?: string;
+  expectedHeadSha?: string;
 }
 
 async function git(cwd: string, ...args: string[]): Promise<string> {
@@ -125,6 +135,18 @@ export class GitWorkspace {
           taskCommitSha,
           ...(taskCommitAlreadyPublished ? { taskCommitAlreadyPublished } : {}),
         };
+      } else if (options.recoverBaselineSha) {
+        // A verified run owns its original baseline even when its current edit
+        // happens to be clean. Never checkout/reset away that recovery context.
+        if (!(await isAncestor(path, options.recoverBaselineSha, head)))
+          throw new Error(
+            "The verified goal baseline is no longer an ancestor of the preserved checkout. Inspect the managed workspace.",
+          );
+        if (remoteSha && !(await isAncestor(path, remoteSha, head)))
+          throw new Error(
+            "The shared branch advanced while this verified goal was interrupted. Preserved edits need manual reconciliation.",
+          );
+        return { path, baselineSha: options.recoverBaselineSha };
       } else if (dirty) {
         if (remoteSha && head !== remoteSha) {
           throw new Error(
@@ -172,44 +194,74 @@ export class GitWorkspace {
       sharedBranch: string;
     },
   ): Promise<{ diff: string; testOutput: string; commitSha: string }> {
-    const { path, baselineSha } = repository;
-    const testOutput = await this.test(path, details.testCommand);
+    const testOutput = await this.test(repository.path, details.testCommand);
     try {
-      const dirty =
-        (await git(
-          path,
-          "status",
-          "--porcelain=v1",
-          "--untracked-files=all",
-        )) !== "";
-      const existingTaskCommit = await taskAtHead(path, details.taskId);
-      const message = [
-        `Complete team task ${details.taskId}`,
-        "",
-        `Team-Agent-Task: ${details.taskId}`,
-        `Team-Agent-Requester: ${details.requester}`,
-        `Team-Agent-Agent: ${details.agent}`,
-      ].join("\n");
+      return { ...(await this.publish(repository, details)), testOutput };
+    } catch (error) {
+      if (error && typeof error === "object")
+        Object.assign(error, { testOutput });
+      throw error;
+    }
+  }
 
-      if (dirty) await git(path, "add", "--all");
-      if (existingTaskCommit) {
-        if (dirty) {
-          await checkedCommand(
-            "git",
-            [
-              "-c",
-              "user.name=Team Agent",
-              "-c",
-              "user.email=team-agent@local",
-              "commit",
-              "--amend",
-              "-m",
-              message,
-            ],
-            path,
-          );
-        }
-      } else {
+  /** Stage the complete deliverable and identify the actual Git tree. */
+  async snapshotTree(repository: PreparedRepository): Promise<string> {
+    await git(repository.path, "add", "--all");
+    return git(repository.path, "write-tree");
+  }
+
+  async head(repository: PreparedRepository): Promise<string> {
+    return git(repository.path, "rev-parse", "HEAD");
+  }
+
+  async publish(
+    repository: PreparedRepository,
+    details: PublishDetails,
+  ): Promise<{ diff: string; commitSha: string }> {
+    const { path, baselineSha } = repository;
+    const assertReviewedState = async () => {
+      if (
+        (await git(path, "branch", "--show-current")) !== details.sharedBranch
+      )
+        throw new Error(
+          "The managed branch changed before publication. Refusing to publish.",
+        );
+      if (
+        details.expectedTreeSha &&
+        (await this.snapshotTree(repository)) !== details.expectedTreeSha
+      )
+        throw new Error(
+          "The code tree changed after independent review. Refusing to publish unreviewed code.",
+        );
+    };
+    await assertReviewedState();
+    if (
+      details.expectedHeadSha &&
+      (await this.head(repository)) !== details.expectedHeadSha
+    )
+      throw new Error(
+        "The repository HEAD changed during review. Refusing to publish.",
+      );
+    const dirty =
+      (await git(path, "status", "--porcelain=v1", "--untracked-files=all")) !==
+      "";
+    const existingTaskCommit = await taskAtHead(path, details.taskId);
+    if (repository.taskCommitAlreadyPublished && dirty) {
+      throw new Error(
+        "Verification changed files in an already published task checkout. The published commit and local edits were preserved for inspection; refusing to amend a commit that other Agents may already use.",
+      );
+    }
+    const message = [
+      `Complete team task ${details.taskId}`,
+      "",
+      `Team-Agent-Task: ${details.taskId}`,
+      `Team-Agent-Requester: ${details.requester}`,
+      `Team-Agent-Agent: ${details.agent}`,
+    ].join("\n");
+
+    if (dirty) await git(path, "add", "--all");
+    if (existingTaskCommit) {
+      if (dirty) {
         await checkedCommand(
           "git",
           [
@@ -218,31 +270,58 @@ export class GitWorkspace {
             "-c",
             "user.email=team-agent@local",
             "commit",
-            ...(dirty ? [] : ["--allow-empty"]),
+            "--amend",
             "-m",
             message,
           ],
           path,
         );
       }
-
-      const commitSha = await git(path, "rev-parse", "HEAD");
-      const diff = await git(
+    } else {
+      await checkedCommand(
+        "git",
+        [
+          "-c",
+          "user.name=Team Agent",
+          "-c",
+          "user.email=team-agent@local",
+          "commit",
+          ...(dirty ? [] : ["--allow-empty"]),
+          "-m",
+          message,
+        ],
         path,
-        "diff",
-        "--no-ext-diff",
-        "--no-color",
-        `${baselineSha}..${commitSha}`,
       );
-      if (!repository.taskCommitAlreadyPublished) {
-        await git(path, "push", "origin", `HEAD:${details.sharedBranch}`);
-      }
-      return { diff, testOutput, commitSha };
-    } catch (error) {
-      if (error && typeof error === "object")
-        Object.assign(error, { testOutput });
-      throw error;
     }
+
+    const commitSha = await git(path, "rev-parse", "HEAD");
+    // Hooks may rewrite staged files during commit; a reviewed goal can only
+    // publish the immutable object whose tree was independently accepted.
+    await assertReviewedState();
+    if (
+      details.expectedTreeSha &&
+      (await git(path, "rev-parse", `${commitSha}^{tree}`)) !==
+        details.expectedTreeSha
+    )
+      throw new Error(
+        "The commit tree differs from the reviewed code tree. Refusing to publish.",
+      );
+    const diff = await git(
+      path,
+      "diff",
+      "--no-ext-diff",
+      "--no-color",
+      `${baselineSha}..${commitSha}`,
+    );
+    if (!repository.taskCommitAlreadyPublished) {
+      await git(
+        path,
+        "push",
+        "origin",
+        `${commitSha}:refs/heads/${details.sharedBranch}`,
+      );
+    }
+    return { diff, commitSha };
   }
 
   async diagnosticDiff(repository: PreparedRepository): Promise<string> {
@@ -297,7 +376,7 @@ export class GitWorkspace {
     await git(path, "clean", "-fd");
   }
 
-  private async test(cwd: string, command: string): Promise<string> {
+  async test(cwd: string, command: string): Promise<string> {
     if (!command.trim()) return "No test command configured.";
     const result = await runCommand(command, [], { cwd, shell: true });
     const output = [result.stdout, result.stderr]

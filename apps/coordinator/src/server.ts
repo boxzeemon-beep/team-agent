@@ -9,7 +9,9 @@ import {
   type Agent,
   addTaskMessageSchema,
   type ContextMessage,
+  canCompleteGoal,
   createTaskSchema,
+  GOAL_WORKFLOW_CAPABILITY,
   type Member,
   type PairingResponse,
   projectSettingsSchema,
@@ -26,6 +28,8 @@ import Fastify, {
 } from "fastify";
 import type { WebSocket } from "ws";
 import { CoordinatorDatabase } from "./database.js";
+import { advanceSimulatedGoal } from "./goal-simulation.js";
+import { pairingCommands } from "./pairing-command.js";
 
 const SESSION_COOKIE = "team_agent_session";
 const DEFAULT_INVITE_TTL = 7 * 24 * 60 * 60_000;
@@ -65,6 +69,7 @@ interface RunnerConnection {
   socket: WebSocket;
   agentId: string;
   lastHeartbeat: number;
+  capabilities: Set<string>;
 }
 
 export async function createApp(
@@ -210,6 +215,54 @@ export async function createApp(
         }
         const result = demoResult(current);
         if (
+          current.brief?.mode === "verified" &&
+          current.workflow &&
+          current.runId
+        ) {
+          const workflow = advanceSimulatedGoal(
+            current.brief,
+            current.workflow,
+          );
+          if (
+            !db.updateGoalWorkflow(
+              current.id,
+              current.selectedAgentId,
+              current.runId,
+              workflow,
+            )
+          )
+            return;
+          db.addMessage(
+            current.id,
+            null,
+            "Demo",
+            "system",
+            `[DEMO] ${workflow.phase}, iteration ${workflow.iteration}/${workflow.maxIterations}; all checks and tree values are simulated.`,
+          );
+          if (workflow.phase === "blocked") {
+            db.finishTask(
+              current.id,
+              current.selectedAgentId,
+              current.assignedThroughMessageSequence,
+              {
+                status: "needs_attention",
+                error: "[DEMO] Review failed at the agreed iteration limit.",
+                progress: "[DEMO] Goal blocked",
+                diff: result.diff,
+                test_output: result.test_output,
+              },
+            );
+            broadcast();
+            scheduleDemo();
+            return;
+          }
+          if (workflow.phase !== "completed") {
+            broadcast();
+            scheduleDemo();
+            return;
+          }
+        }
+        if (
           db.finishTask(
             current.id,
             current.selectedAgentId,
@@ -246,7 +299,7 @@ export async function createApp(
       .listAgents()
       .filter((agent) => agent.status === "online")
       .map((agent) => agent.id);
-    const task = db.earliestRunnable(online);
+    const task = db.earliestRunnable(online, online);
     if (!task) return;
     demoTimer = setTimeout(() => {
       demoTimer = null;
@@ -335,12 +388,25 @@ export async function createApp(
       contextMessages,
       contextThroughSequence,
       settings: db.getSettings(),
+      ...(task.brief ? { brief: task.brief } : {}),
+      ...(task.runId ? { runId: task.runId } : {}),
     };
   };
 
   const resumeActiveTask = (agent: Agent, socket: WebSocket): boolean => {
     const task = db.activeTaskForAgent(agent.id);
     if (!task) return false;
+    if (
+      task.brief?.mode === "verified" &&
+      !runners.get(agent.id)?.capabilities.has(GOAL_WORKFLOW_CAPABILITY)
+    ) {
+      send(socket, {
+        type: "runner.error",
+        message:
+          "Active goal requires goal-workflow-v1. Upgrade this Runner before resuming.",
+      });
+      return true;
+    }
     const persisted = db.activeAssignmentForAgent(agent.id);
     send(socket, {
       type: "task.assign",
@@ -365,7 +431,16 @@ export async function createApp(
         (agentId) =>
           isConnected(agentId) && db.agentById(agentId)?.status === "online",
       );
-      const task = db.earliestRunnable(online);
+      const verified = online.filter((agentId) =>
+        runners.get(agentId)?.capabilities.has(GOAL_WORKFLOW_CAPABILITY),
+      );
+      let upgradeChanged = false;
+      for (const agentId of online)
+        if (!verified.includes(agentId))
+          upgradeChanged =
+            db.markWorkflowUpgradeRequired(agentId) || upgradeChanged;
+      if (upgradeChanged) broadcast();
+      const task = db.earliestRunnable(online, verified);
       if (!task) return;
       const agent = db.agentById(task.selectedAgentId);
       const connection = runners.get(task.selectedAgentId);
@@ -496,7 +571,7 @@ export async function createApp(
     const result: PairingResponse = {
       pairingToken: raw,
       expiresAt,
-      command: `npx --yes --package=https://github.com/boxzeemon-beep/team-agent/releases/latest/download/team-agent-runner.tgz team-agent runner --coordinator ${JSON.stringify(publicUrl)} --pair ${JSON.stringify(raw)} --name ${JSON.stringify(displayName)}`,
+      ...pairingCommands(publicUrl, raw, displayName),
     };
     return result;
   });
@@ -580,6 +655,7 @@ export async function createApp(
         : isConnected(agent.id)
           ? "queued"
           : "waiting_for_agent",
+      parsed.data.brief,
     );
     broadcast();
     schedule();
@@ -760,6 +836,13 @@ export async function createApp(
       }
       const message = parsed.data;
       if (message.type === "runner.register") {
+        if (registeredAgentId) {
+          send(socket, {
+            type: "runner.error",
+            message: "This connection is already registered",
+          });
+          return;
+        }
         let agent: Agent | null = null;
         let runnerRaw = message.runnerToken;
         if (runnerRaw) {
@@ -791,6 +874,7 @@ export async function createApp(
           socket,
           agentId: agent.id,
           lastHeartbeat: Date.now(),
+          capabilities: new Set(message.capabilities ?? []),
         });
         send(socket, {
           type: "runner.registered",
@@ -808,6 +892,9 @@ export async function createApp(
         return;
       }
       const agentId = registeredAgentId;
+      // Closing a replaced socket is asynchronous. Frames already in flight
+      // must not release the project lock or overwrite the current owner's work.
+      if (runners.get(agentId)?.socket !== socket) return;
       if (message.type === "runner.heartbeat") {
         if (message.agentId !== agentId) return;
         const connection = runners.get(agentId);
@@ -821,6 +908,30 @@ export async function createApp(
           type: "runner.error",
           message: "Task is not assigned to this agent",
         });
+        return;
+      }
+      if (task.brief?.mode === "verified" && message.runId !== task.runId) {
+        send(socket, {
+          type: "runner.error",
+          message: "Goal run does not match the active assignment",
+        });
+        return;
+      }
+      if (message.type === "task.workflow") {
+        if (
+          !db.updateGoalWorkflow(
+            task.id,
+            agentId,
+            message.runId,
+            message.workflow,
+          )
+        )
+          send(socket, {
+            type: "runner.error",
+            message:
+              "Goal workflow is stale or inconsistent with the agreed brief",
+          });
+        else broadcast();
         return;
       }
       if (message.type === "task.progress") {
@@ -857,6 +968,20 @@ export async function createApp(
         }
       } else if (message.type === "task.complete") {
         if (
+          task.brief?.mode === "verified" &&
+          !canCompleteGoal(task.brief, task.workflow)
+        ) {
+          send(socket, {
+            type: "runner.error",
+            message:
+              "Goal completion rejected: tests and every acceptance criterion must pass on a reviewed tree before publishing",
+          });
+          return;
+        }
+        const completedBranch =
+          db.activeAssignmentForAgent(agentId)?.settings.sharedBranch ??
+          db.getSettings().sharedBranch;
+        if (
           db.finishTask(
             message.taskId,
             agentId,
@@ -888,7 +1013,7 @@ export async function createApp(
             "System",
             "system",
             [
-              `Completed on ${db.getSettings().sharedBranch} at commit ${message.commitSha}.`,
+              `Completed on ${completedBranch} at commit ${message.commitSha}.`,
               message.testOutput.trim()
                 ? `Tests:\n${message.testOutput.slice(0, 2_000)}`
                 : "Tests produced no output.",

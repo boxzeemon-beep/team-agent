@@ -12,6 +12,7 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { RunnerClientMessage } from "@team-agent/shared";
+import type { GoalCheckpoint } from "./goal-workflow.js";
 
 export interface RunnerState {
   deviceId: string;
@@ -19,6 +20,8 @@ export interface RunnerState {
   agentId?: string;
   ownerMemberId?: string;
   activeTaskId?: string;
+  activeRunId?: string;
+  goalCheckpoints: Record<string, GoalCheckpoint>;
   projects: Record<string, { threadId?: string; lastTaskId?: string }>;
   completedTasks: Record<
     string,
@@ -121,11 +124,17 @@ export class StateStore {
       ) as RunnerState;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      this.state = { deviceId: randomUUID(), projects: {}, completedTasks: {} };
+      this.state = {
+        deviceId: randomUUID(),
+        projects: {},
+        completedTasks: {},
+        goalCheckpoints: {},
+      };
       await this.save();
     }
     this.state.projects ??= {};
     this.state.completedTasks ??= {};
+    this.state.goalCheckpoints ??= {};
     return this.state;
   }
 

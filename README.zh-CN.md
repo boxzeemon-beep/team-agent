@@ -1,8 +1,67 @@
+# Team Agent — 目标验收工作台
+
+本轮实际交付与验证边界：[2026-09-09 交付记录](docs/delivery.md)。
+
+**`main` 源码包含目标验收工作台。** 写清目标、背景与验收标准，选择队友的 Agent；
+真实测试与新的只读 Codex 审查通过后才允许发布，可修复的问题在 1–3 轮上限内返回实现阶段。
+直接打开 **[GitHub Pages 浏览器工作台](https://boxzeemon-beep.github.io/team-agent/)**，
+也可以在本地运行同一套模拟演示。下方历史截图和视频仍来自原 v0.2.0 界面。
+
+本次更新范围是源码与 Pages，不创建版本 tag，也不更新 Docker 镜像：
+`:0.2.0` 与 `:latest` 仍为原版本。新版工作台和 Runner 请运行当前 `main` 源码或自行构建。
+
+在当前源码目录使用 Node.js 22.5+ 和 pnpm 11 启动：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm demo:browser
+```
+
+打开 **[本地工作台](http://127.0.0.1:4321/team-agent/)**。首次进入浏览器模拟演示时，
+会看到六条案例。“任务卡片支持键盘操作”展示第一轮审查失败、第二轮修订通过；
+“API 超时有限重试”在约定的一轮上限停止，重新排队仍保留该上限。
+新建一个两轮目标可以完整体验模拟修订流程；详情还提供代码 diff、原始测试记录、
+反馈与 Markdown 导出。
+
+**浏览器预览不会调用 Codex、修改仓库或实际运行测试；案例和结果均为模拟。**
+真实执行仍需 Coordinator 与 Agent 所有者电脑上的配对 Runner。
+
+隔离的真实 Codex 小目标验证完成了实现和项目测试，但网络超时使独立审查未能完成，
+最终为 **blocked**，没有发布代码。当前尚未证明完整真实模型的验收与推送闭环，
+详见[实测记录](docs/delivery.md#真实-codex-尝试实现成功完整验收未通过)。
+
+### 两种执行方式
+
+| 方式 | 约定与完成条件 |
+| --- | --- |
+| 验收目标 | 背景、1–12 条不重复的验收标准、1–3 轮上限。项目必须配置真实测试命令；测试通过、新只读审查逐条通过且没有遗留问题，才能提交并推送被审查的代码。 |
+| 直接任务 | 保留原有实现、配置的测试、提交与推送流程，不生成逐条独立验收结论。 |
+
+实现与审查使用**同一位所选 Runner 上不同的 Codex 会话**。审查会话只读，不能批准写入升级。
+证据不足、最终验收未通过、被审查代码变化或用尽轮次时，目标进入“需要处理”；
+模型结束一轮回复不代表目标完成。项目代码写入仍然串行执行。
+
+任务反馈可以生成**新的可编辑目标草稿**，带入来源任务、上次结果与背景，
+由成员核对后提交；新目标重新验收，不继承旧结论。“重新排队”则保留原目标约定，
+创建新 runId 并归档旧证据。断线重连恢复同一执行与冻结的分配；
+旧 Runner 收到验收目标时会显示 `goal-workflow-v1` 升级提示，仍可执行直接任务。
+
+产品改进参考了 [Anthropic 团队工作方式研究](docs/claude-team-research.md)，
+当前执行后端仍为 Codex，未切换为 Claude。
+
+[工作台使用、架构取舍与验证说明](docs/workbench.md) ·
+[English](README.md) · [部署指南](#部署给团队使用)
+
+---
+
+下方封面、截图与视频保留自原 v0.2.0 战术大厅，公开 Pages 链接进入浏览器工作台。
+固定版本的部署命令仍运行 v0.2.0；源码启动命令运行的是当前检出的分支。
+
 <p align="center">
   <img src="docs/assets/social-preview.png" alt="Team Agent——团队 Coding Agent 的多人协作大厅" width="100%" />
 </p>
 
-# Team Agent
+## 团队如何协作
 
 **团队 Coding Agent 的多人协作大厅。**
 
@@ -11,7 +70,7 @@
 
 **Codex 与 Git 凭据始终留在 Agent 所有者的电脑上。**
 
-[▶ 直接试玩公开网页版](https://boxzeemon-beep.github.io/team-agent/) ·
+[▶ 打开浏览器工作台](https://boxzeemon-beep.github.io/team-agent/) ·
 [🚀 部署给团队使用](#部署给团队使用) ·
 [⭐ Star Team Agent](https://github.com/boxzeemon-beep/team-agent)
 
@@ -22,11 +81,11 @@
 
 [English](README.md) · [战术大厅体验](docs/tactical-lobby-experience.md) · [架构](docs/architecture.md) · [安全](SECURITY.md) · [路线图](ROADMAP.md) · [参与贡献](CONTRIBUTING.md)
 
-![Team Agent 演示：选择队友的 Agent、跟踪执行并查看结果](docs/assets/team-agent-demo.gif)
+![历史 v0.2.0 战术大厅：选择队友的 Agent、跟踪执行并查看模拟结果](docs/assets/team-agent-demo.gif)
 
 **选择 Agent → 发布任务 → 观看执行 → 审查结果**
 
-_[观看 MP4](docs/assets/team-agent-demo.mp4) · [查看全部工作流状态](docs/quickstart-demo.md)。画面来自正式战术大厅，任务证据均明确标注为模拟数据。_
+_[观看历史 MP4](docs/assets/team-agent-demo.mp4) · [原版工作流说明](docs/quickstart-demo.md)。画面来自 v0.2.0 战术大厅；当前工作台请打开 Pages 演示，历史素材中的任务证据均为模拟数据。_
 
 ## 30 秒理解 Team Agent
 
@@ -61,11 +120,11 @@ Codex 登录信息和 Git 凭据不会上传到 Coordinator。
 
 团队可以查看发起人、实际 Agent、所有者、对话、回复、diff、测试与 commit。
 
-## 打开试玩大厅
+## 打开浏览器演示
 
-**[直接试玩公开网页版 →](https://boxzeemon-beep.github.io/team-agent/)** — 无需安装、登录、Coordinator、Codex 或 Git 仓库。公开演示中的数据与操作均明确标记为模拟，并且只在浏览器中运行。
+**[打开公开浏览器工作台 →](https://boxzeemon-beep.github.io/team-agent/)** — 无需安装、登录、Coordinator、Codex 或 Git 仓库。可以体验目标、有限轮次修订、逐项审查、反馈草稿与证据导出。所有数据和操作均为模拟，只在浏览器中运行。Pages 不提供托管的 Coordinator，也不能配对真实 Runner。
 
-也可以在本地运行带有预置内容的战术大厅，无需 Codex 登录或 Git 仓库：
+需要体验历史 v0.2.0 战术大厅时，可以运行固定版本镜像，无需 Codex 登录或 Git 仓库：
 
 ```bash
 docker run --rm -p 127.0.0.1:4310:4310 -e TEAM_AGENT_DEMO_MODE=1 \
@@ -142,6 +201,9 @@ docker compose up -d
 `ghcr.io/boxzeemon-beep/team-agent:0.2.0`，首次启动无需在本机编译源码。Docker
 会根据当前主机选择 `linux/amd64` 或 `linux/arm64` 镜像；需要固定其他已发布版本时，在 `.env` 中设置 `TEAM_AGENT_IMAGE`。
 
+此镜像和 `:latest` 镜像仍为 v0.2.0。部署 `main` 中的新工作台时，请使用下方源码构建的
+Compose 覆盖配置，或不使用 Docker 的源码启动命令。本次源码与 Pages 更新不发布新镜像。
+
 在 `.env` 中把 `TEAM_AGENT_PUBLIC_URL` 设置为团队实际使用的 HTTPS 地址。Docker Compose 会发布 `4310` 端口，应通过私网或主机防火墙限制访问。使用 Tailscale Serve 时运行：
 
 ```bash
@@ -157,22 +219,32 @@ tailscale serve status
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
-不使用 Docker 的源码开发需要 Node.js 22.5+ 与 pnpm 11，可运行 `pnpm coordinator` 或 `pnpm coordinator:built`；源码进程默认监听 `127.0.0.1:4310`。
+不使用 Docker 的源码开发需要 Node.js 22.5+ 与 pnpm 11。先运行 `pnpm install --frozen-lockfile`，开发时使用 `pnpm coordinator:dev`（网页在 `http://127.0.0.1:4311`）；正式构建运行则依次执行 `pnpm build` 和 `pnpm coordinator:built`。Coordinator 默认监听 `127.0.0.1:4310`。单独执行 `pnpm coordinator` 只启动后端，若要由它提供网页，需要先完成构建。
 
 ### 2. 配置项目
 
-在浏览器领取管理员邀请，然后设置项目名称、Git 仓库地址、基础分支、共享工作分支和可选测试命令。接着为每位队友生成独立邀请。
+在浏览器领取管理员邀请，点击顶部项目名进入项目设置，填写项目名称、Git 仓库地址、基础分支、共享工作分支和测试命令。验收目标必须配置真实测试命令；直接任务的测试命令可选。接着为每位队友生成独立邀请。
 
 ### 3. 配对 Runner
 
-Agent 所有者在项目页面点击“贡献我的 Codex”。页面会生成以下形式的一次性命令：
+新版工作台需要在 Agent 所有者电脑上准备当前 `main` 源码，点击网页中的“接入 Agent”。
+安装依赖并构建后，从源码目录运行页面生成的一次性配对命令：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "张三的 Codex"
+```
+
+当前 Runner 支持验收目标要求的 `goal-workflow-v1`。最新 GitHub Release 中的 Runner
+仍为 v0.2.0，不会随 `main` 或 Pages 更新获得新能力。旧发布版本的接入命令仍为：
 
 ```bash
 npx --yes --package=https://github.com/boxzeemon-beep/team-agent/releases/latest/download/team-agent-runner.tgz \
   team-agent runner --coordinator "https://COORDINATOR.example" --pair "PAIRING_TOKEN" --name "张三的 Codex"
 ```
 
-该命令直接运行最新 GitHub Release 产物，不依赖 npm 包已经发布。需要长期使用全局命令时，可运行 `scripts/runner-install.sh` 或 `scripts/runner-install.ps1`，再通过 `team-agent doctor --coordinator "https://COORDINATOR.example"` 检查主机环境。从源码开发的贡献者也可通过 `pnpm runner -- ...` 使用相同参数。
+该发布包命令直接运行最新 GitHub Release 产物，不依赖 npm 包已经发布。需要长期使用该发布版本的全局命令时，可运行 `scripts/runner-install.sh` 或 `scripts/runner-install.ps1`，再通过 `team-agent doctor --coordinator "https://COORDINATOR.example"` 检查主机环境。验收目标请使用上方的源码运行方式。
 
 配对 token 只使用一次。默认情况下，Runner 把设备身份、Codex Thread ID 和受管副本保存在 `~/.team-agent/runner/`。后续使用相同 Coordinator、名称和数据目录重启，并省略 `--pair`。
 

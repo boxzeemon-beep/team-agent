@@ -40,7 +40,7 @@ describe("Runner CLI options", () => {
     expect(
       parseCliOptions(["--coordinator", "http://localhost:4310"]).dataDir,
     ).toBe(defaultRunnerDataDir);
-    expect(defaultRunnerDataDir).toContain(".team-agent/runner");
+    expect(defaultRunnerDataDir).toContain(join(".team-agent", "runner"));
     expect(defaultRunnerDataDir).not.toContain("alpha");
   });
 

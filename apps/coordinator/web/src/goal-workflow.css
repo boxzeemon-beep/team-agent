@@ -1,0 +1,468 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: These selectors style separate composer and evidence components; media queries override each component. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.goal-composer {
+  margin: 4px 22px 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.goal-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.goal-mode-control {
+  margin: 0;
+  min-width: 0;
+  display: inline-flex;
+  gap: 3px;
+  border: 1px solid #e0e8e1;
+  border-radius: 9px;
+  background: #f7f9f7;
+  padding: 3px;
+}
+.goal-mode-control button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  color: #63716a;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.goal-mode-control button[aria-pressed="true"] {
+  background: white;
+  color: var(--green-dark);
+  box-shadow: 0 1px 4px #1c43211c;
+  font-weight: 650;
+}
+.iteration-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64756b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.iteration-control select {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 5px;
+  color: var(--ink);
+}
+.criteria-editor > label {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+}
+.criteria-editor small {
+  font-size: 11px;
+  color: #687a6f;
+  font-weight: 400;
+}
+.composer-card .criteria-editor textarea,
+.composer-card .goal-context-editor textarea {
+  display: block;
+  width: 100%;
+  background: #f9fbf8;
+  border: 1px solid #e1e9e2;
+  border-radius: 8px;
+  margin: 9px 0 0;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+  min-height: 80px;
+}
+.composer-card .criteria-editor textarea::placeholder,
+.composer-card .goal-context-editor textarea::placeholder {
+  color: #7b877f;
+}
+.criteria-editor > p,
+.goal-context-editor > p,
+.direct-mode-note {
+  font-size: 11px;
+  color: #63746a;
+  line-height: 1.7;
+  margin: 9px 0 0;
+}
+.criteria-editor > p {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.criteria-editor > p svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.goal-context-editor {
+  padding-top: 10px;
+}
+.goal-context-editor summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  color: #546e5e;
+  font-size: 12px;
+}
+.goal-context-editor summary > span {
+  font-size: 10px;
+  background: #f0f4f0;
+  border-radius: 4px;
+  padding: 0 5px;
+  color: #65776b;
+}
+.goal-context-editor summary::after {
+  content: "+";
+  margin-left: auto;
+  color: #748478;
+}
+.goal-context-editor[open] summary::after {
+  content: "−";
+}
+.task-row-main .task-workflow-label {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #edf3ef;
+  color: #386448;
+  font-size: 10px;
+}
+.workflow-evidence {
+  border: 1px solid #d7e4d9;
+  border-radius: 12px;
+  padding: 20px;
+  background: linear-gradient(150deg, #f6faf5 0%, #fff 64%);
+}
+.workflow-evidence.is-blocked {
+  border-color: #e7d9c5;
+  background: linear-gradient(150deg, #fdfaf3 0%, #fff 64%);
+}
+.workflow-evidence-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.workflow-evidence-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 17px;
+  font-weight: 650;
+  margin: 5px 0 0;
+}
+.workflow-evidence-heading .section-label {
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  color: #697b68;
+}
+.workflow-round {
+  font-size: 11px;
+  padding: 4px 9px;
+  border: 1px solid #e2e9dc;
+  border-radius: 20px;
+  color: #567053;
+  white-space: nowrap;
+  background: #fff;
+}
+.workflow-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 0;
+  margin: 22px 0 18px;
+  gap: 8px;
+}
+.workflow-steps li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #7a877c;
+  padding-bottom: 11px;
+  border-bottom: 2px solid #e8ede5;
+}
+.workflow-steps li > span {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #eef1eb;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.workflow-steps li.current {
+  color: #275c39;
+  border-color: #568365;
+  font-weight: 650;
+}
+.workflow-steps li.current > span {
+  background: #2f6446;
+  color: white;
+}
+.workflow-steps li.done {
+  color: #3d6949;
+  border-color: #9cb79b;
+}
+.workflow-steps li.done > span {
+  background: #e1eddf;
+  color: #3b7147;
+}
+.workflow-status-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.workflow-status-line > span {
+  color: #6d796c;
+  font-size: 11px;
+}
+.workflow-guidance {
+  font-size: 12px;
+  color: #786547;
+  background: #faf6e9;
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin: 12px 0;
+}
+.acceptance-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: 17px;
+  border-top: 1px solid #e5ebe0;
+  font-size: 12px;
+}
+.acceptance-title > span {
+  font-size: 11px;
+  color: #63755f;
+}
+.acceptance-list {
+  padding: 0;
+  list-style: none;
+  margin: 9px 0 0;
+}
+.acceptance-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eef1e9;
+}
+.acceptance-list > li:last-child {
+  border-bottom: 0;
+}
+.criterion-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 23px;
+  height: 23px;
+  background: #eff2eb;
+  border-radius: 50%;
+  color: #6b7a65;
+  margin-top: 1px;
+}
+.criterion-pass .criterion-icon {
+  background: #e3efdf;
+  color: #3a6942;
+}
+.criterion-fail .criterion-icon {
+  background: #faebdd;
+  color: #986333;
+}
+.acceptance-list li > div {
+  min-width: 0;
+  flex: 1;
+}
+.acceptance-list strong {
+  font-size: 13px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.acceptance-list small {
+  display: inline-block;
+  padding-left: 8px;
+  font-size: 10px;
+  color: #798473;
+  white-space: nowrap;
+}
+.criterion-pass small {
+  color: #427045;
+}
+.criterion-fail small {
+  color: #95613f;
+}
+.acceptance-list p {
+  font-size: 12px;
+  color: #667463;
+  margin: 5px 0 0;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.review-conclusion {
+  background: #f5f7f1;
+  border-radius: 8px;
+  padding: 13px 15px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.review-conclusion p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.review-conclusion ul,
+.review-history ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.review-conclusion small {
+  display: block;
+  color: #6d7865;
+  margin-top: 8px;
+  font-size: 10px;
+}
+.review-conclusion code {
+  overflow-wrap: anywhere;
+}
+.review-history {
+  font-size: 12px;
+  margin-top: 14px;
+}
+.review-history summary {
+  color: #56704d;
+  cursor: pointer;
+}
+.review-history > div {
+  border-left: 2px solid #dce5d5;
+  margin-top: 12px;
+  padding-left: 12px;
+  color: #63765a;
+}
+.review-history p {
+  margin: 4px 0;
+}
+.workflow-method {
+  margin: 14px 0 0;
+  color: #74806d;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.feedback-next-goal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #dce6d6;
+  border-radius: 9px;
+  background: #f6f9f3;
+}
+.feedback-next-goal strong {
+  font-size: 13px;
+}
+.feedback-next-goal p {
+  font-size: 11px;
+  color: #62765a;
+  margin: 4px 0 0;
+}
+.feedback-next-goal .button {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .goal-composer {
+    margin: 3px 14px 14px;
+    padding-top: 13px;
+  }
+  .goal-mode-row {
+    gap: 7px;
+  }
+  .goal-mode-control button {
+    font-size: 11px;
+    padding: 5px 7px;
+  }
+  .iteration-control {
+    font-size: 10px;
+    gap: 3px;
+  }
+  .criteria-editor > label {
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+  .criteria-editor small {
+    font-size: 10px;
+  }
+  .workflow-evidence {
+    padding: 15px 13px;
+  }
+  .workflow-evidence-heading .section-label {
+    font-size: 8px;
+    letter-spacing: 0.8px;
+  }
+  .workflow-round {
+    padding: 4px 7px;
+    font-size: 10px;
+  }
+  .workflow-steps {
+    gap: 6px;
+  }
+  .workflow-steps li {
+    gap: 4px;
+    font-size: 11px;
+  }
+  .workflow-steps li > span {
+    width: 19px;
+    height: 19px;
+    font-size: 10px;
+  }
+  .workflow-status-line,
+  .acceptance-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .feedback-next-goal {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .feedback-next-goal .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .task-row-main .task-workflow-label {
+    max-width: 120px;
+  }
+}

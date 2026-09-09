@@ -3,12 +3,20 @@ import type {
   Agent,
   ContextMessage,
   DashboardSnapshot,
+  GoalBrief,
+  GoalWorkflow,
   Member,
   ProjectSettings,
   Task,
   TaskAssignment,
   TaskMessage,
   TaskStatus,
+} from "@team-agent/shared";
+import {
+  canCompleteGoal,
+  goalBriefSchema,
+  goalWorkflowSchema,
+  initialGoalWorkflow,
 } from "@team-agent/shared";
 
 type SqlValue = string | number | null;
@@ -121,6 +129,11 @@ export class CoordinatorDatabase {
       this.sqlite.exec(
         "ALTER TABLE tasks ADD COLUMN assignment_json TEXT NOT NULL DEFAULT ''",
       );
+    for (const column of ["brief_json", "workflow_json", "run_id"])
+      if (!taskColumns.some((existing) => existing.name === column))
+        this.sqlite.exec(
+          `ALTER TABLE tasks ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`,
+        );
   }
 
   private transaction<T>(operation: () => T): T {
@@ -682,14 +695,28 @@ export class CoordinatorDatabase {
     agent: Agent,
     prompt: string,
     status: TaskStatus,
+    brief?: GoalBrief,
   ): Task {
     const stamp = now();
     this.transaction(() => {
       this.sqlite
         .prepare(
-          `INSERT INTO tasks (id, requester_member_id, selected_agent_id, status, prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO tasks (id, requester_member_id, selected_agent_id, status, prompt, created_at, updated_at, brief_json, workflow_json, run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(id, requester.id, agent.id, status, prompt, stamp, stamp);
+        .run(
+          id,
+          requester.id,
+          agent.id,
+          status,
+          prompt,
+          stamp,
+          stamp,
+          brief ? JSON.stringify(brief) : "",
+          brief?.mode === "verified"
+            ? JSON.stringify(initialGoalWorkflow(brief))
+            : "",
+          brief?.mode === "verified" ? crypto.randomUUID() : "",
+        );
       this.addMessage(id, requester.id, requester.name, "member", prompt);
     });
     return this.taskById(id) as Task;
@@ -747,6 +774,12 @@ export class CoordinatorDatabase {
 
   private mapTask(row: Record<string, SqlValue>): Task {
     const id = String(row.id);
+    const brief = row.brief_json
+      ? goalBriefSchema.parse(JSON.parse(String(row.brief_json)))
+      : undefined;
+    const workflow = row.workflow_json
+      ? goalWorkflowSchema.parse(JSON.parse(String(row.workflow_json)))
+      : undefined;
     return {
       id,
       requesterMemberId: String(row.requester_member_id),
@@ -768,6 +801,9 @@ export class CoordinatorDatabase {
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
       messages: this.messagesForTask(id),
+      ...(brief ? { brief } : {}),
+      ...(workflow ? { workflow } : {}),
+      ...(row.run_id ? { runId: String(row.run_id) } : {}),
     };
   }
 
@@ -842,17 +878,28 @@ export class CoordinatorDatabase {
     }
   }
 
-  earliestRunnable(onlineAgentIds: string[]): Task | null {
+  earliestRunnable(
+    onlineAgentIds: string[],
+    verifiedAgentIds?: string[],
+  ): Task | null {
     if (onlineAgentIds.length === 0) return null;
     const marks = onlineAgentIds.map(() => "?").join(",");
-    const row = this.sqlite
+    const rows = this.sqlite
       .prepare(
         this.taskSelect(
-          `WHERE t.status IN ('queued','waiting_for_agent') AND t.selected_agent_id IN (${marks}) ORDER BY t.created_at LIMIT 1`,
+          `WHERE t.status IN ('queued','waiting_for_agent') AND t.selected_agent_id IN (${marks}) ORDER BY t.created_at`,
         ),
       )
-      .get(...onlineAgentIds) as Record<string, SqlValue> | undefined;
-    return row ? this.mapTask(row) : null;
+      .all(...onlineAgentIds) as Record<string, SqlValue>[];
+    for (const row of rows) {
+      const task = this.mapTask(row);
+      if (
+        task.brief?.mode !== "verified" ||
+        verifiedAgentIds?.includes(task.selectedAgentId)
+      )
+        return task;
+    }
+    return null;
   }
 
   assignTask(
@@ -863,6 +910,11 @@ export class CoordinatorDatabase {
   ): boolean {
     return this.transaction(() => {
       if (this.hasActiveTask()) return false;
+      const task = this.taskById(taskId);
+      if (task?.brief?.mode === "verified" && assignment.runId !== task.runId)
+        return false;
+      if (JSON.stringify(task?.brief) !== JSON.stringify(assignment.brief))
+        return false;
       const result = this.sqlite
         .prepare(
           "UPDATE tasks SET status='running', progress='Assigned to agent', assigned_through_message_sequence=?, assignment_json=?, updated_at=? WHERE id=? AND selected_agent_id=? AND status IN ('queued','waiting_for_agent')",
@@ -890,12 +942,101 @@ export class CoordinatorDatabase {
   }
 
   retryTask(taskId: string, status: TaskStatus): boolean {
-    const result = this.sqlite
-      .prepare(
-        "UPDATE tasks SET status=?, progress='', error='', updated_at=? WHERE id=? AND status='needs_attention'",
+    return this.transaction(() => {
+      const task = this.taskById(taskId);
+      if (task?.status !== "needs_attention") return false;
+      if (task.workflow)
+        this.addMessage(
+          taskId,
+          null,
+          "System",
+          "system",
+          `Previous goal run ${task.runId} (archived evidence): ${JSON.stringify({ workflow: task.workflow, result: task.result, diff: task.diff, testOutput: task.testOutput, commitSha: task.commitSha, error: task.error })}`,
+        );
+      const result = this.sqlite
+        .prepare(
+          "UPDATE tasks SET status=?, progress='', error='', result='', diff='', test_output='', commit_sha='', assignment_json='', workflow_json=?, run_id=?, updated_at=? WHERE id=? AND status='needs_attention'",
+        )
+        .run(
+          status,
+          task.brief?.mode === "verified"
+            ? JSON.stringify(initialGoalWorkflow(task.brief))
+            : "",
+          task.brief?.mode === "verified" ? crypto.randomUUID() : "",
+          now(),
+          taskId,
+        );
+      return Boolean(result.changes);
+    });
+  }
+
+  updateGoalWorkflow(
+    taskId: string,
+    agentId: string,
+    runId: string,
+    workflow: GoalWorkflow,
+  ): boolean {
+    const task = this.taskById(taskId);
+    if (
+      task?.brief?.mode !== "verified" ||
+      task.runId !== runId ||
+      workflow.maxIterations !== task.brief.maxIterations ||
+      workflow.sequence <= (task.workflow?.sequence ?? 0) ||
+      workflow.iteration < (task.workflow?.iteration ?? 1) ||
+      workflow.iteration > (task.workflow?.iteration ?? 1) + 1
+    )
+      return false;
+    if (
+      ["publishing", "completed"].includes(workflow.phase) &&
+      !canCompleteGoal(task.brief, workflow)
+    )
+      return false;
+    if (
+      workflow.iteration > (task.workflow?.iteration ?? 1) &&
+      !workflow.reviews.some(
+        (review) =>
+          review.iteration === (task.workflow?.iteration ?? 1) &&
+          review.verdict === "revise",
       )
-      .run(status, now(), taskId);
-    return Boolean(result.changes);
+    )
+      return false;
+    const prior = task.workflow?.reviews ?? [];
+    if (
+      prior.length > workflow.reviews.length ||
+      prior.some(
+        (review, index) =>
+          JSON.stringify(review) !== JSON.stringify(workflow.reviews[index]),
+      )
+    )
+      return false;
+    const reviewedIterations = new Set<number>();
+    for (const review of workflow.reviews) {
+      if (
+        review.iteration > workflow.iteration ||
+        reviewedIterations.has(review.iteration) ||
+        review.checks.some(
+          (check) => !task.brief?.acceptanceCriteria.includes(check.criterion),
+        ) ||
+        new Set(review.checks.map((check) => check.criterion)).size !==
+          review.checks.length
+      )
+        return false;
+      reviewedIterations.add(review.iteration);
+    }
+    return this.updateTaskFromRunner(taskId, agentId, {
+      workflow_json: JSON.stringify(workflow),
+      progress: `Goal ${workflow.phase} · iteration ${workflow.iteration}/${workflow.maxIterations}`,
+    });
+  }
+
+  markWorkflowUpgradeRequired(agentId: string): boolean {
+    return Boolean(
+      this.sqlite
+        .prepare(
+          "UPDATE tasks SET status='waiting_for_agent', progress='此目标需要支持 goal-workflow-v1 的新版 Runner，请升级后重连。' WHERE selected_agent_id=? AND status IN ('queued','waiting_for_agent') AND brief_json<>'' AND json_extract(brief_json, '$.mode')='verified' AND progress<>'此目标需要支持 goal-workflow-v1 的新版 Runner，请升级后重连。'",
+        )
+        .run(agentId).changes,
+    );
   }
 
   cancelTask(taskId: string): boolean {
@@ -985,6 +1126,13 @@ export class CoordinatorDatabase {
     agentStatus: Agent["status"] = "online",
   ): boolean {
     return this.transaction(() => {
+      const task = this.taskById(taskId);
+      if (
+        fields.status === "completed" &&
+        task?.brief?.mode === "verified" &&
+        !canCompleteGoal(task.brief, task.workflow)
+      )
+        return false;
       if (!this.updateTaskFromRunner(taskId, agentId, fields)) return false;
       this.sqlite
         .prepare(

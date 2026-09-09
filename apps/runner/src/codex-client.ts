@@ -26,7 +26,17 @@ export interface CodexTurnResult {
   text: string;
 }
 
+export interface CodexTurnOptions {
+  cwd: string;
+  prompt: string;
+  threadId?: string;
+  /** A reviewer always gets a fresh thread with no permission escalation. */
+  readOnly?: boolean;
+  outputSchema?: Record<string, unknown>;
+}
+
 interface PendingRequest {
+  method: string;
   resolve(value: unknown): void;
   reject(error: Error): void;
 }
@@ -37,6 +47,8 @@ interface ActiveTurn {
   text: string;
   lastTextProgressAt: number;
   callbacks: CodexTurnCallbacks;
+  readOnly: boolean;
+  fileChanges: Map<string, string>;
   resolve(value: CodexTurnResult): void;
   reject(error: Error): void;
 }
@@ -50,12 +62,18 @@ export class CodexAppServerClient {
   private activeTurn: ActiveTurn | undefined;
   private approvalChain = Promise.resolve();
 
+  constructor(private readonly launch?: { command: string; args: string[] }) {}
+
   async start(): Promise<void> {
     if (this.child) return;
-    const binary = process.env.CODEX_BIN ?? "codex";
-    const child = spawn(binary, ["app-server", "--stdio"], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const binary = this.launch?.command ?? process.env.CODEX_BIN ?? "codex";
+    const child = spawn(
+      binary,
+      this.launch?.args ?? ["app-server", "--stdio"],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     this.child = child;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) =>
@@ -101,13 +119,13 @@ export class CodexAppServerClient {
   }
 
   async runTurn(
-    options: { cwd: string; prompt: string; threadId?: string },
+    options: CodexTurnOptions,
     callbacks: CodexTurnCallbacks,
   ): Promise<CodexTurnResult> {
     await this.start();
     if (this.activeTurn)
       throw new Error("Codex already has an active team task");
-    let threadId = options.threadId;
+    let threadId = options.readOnly ? undefined : options.threadId;
     if (threadId) {
       try {
         await this.request("thread/resume", {
@@ -128,9 +146,11 @@ export class CodexAppServerClient {
     if (!threadId) {
       const started = (await this.request("thread/start", {
         cwd: options.cwd,
-        approvalPolicy: "untrusted",
+        approvalPolicy: options.readOnly ? "never" : "untrusted",
         approvalsReviewer: "user",
-        sandbox: "workspace-write",
+        sandbox: options.readOnly ? "read-only" : "workspace-write",
+        // Keep independent review threads addressable for audit and local
+        // collaboration tools; isolation comes from a fresh thread + sandbox.
         ephemeral: false,
       })) as { thread?: { id?: string } };
       threadId = started.thread?.id;
@@ -147,6 +167,8 @@ export class CodexAppServerClient {
         text: "",
         lastTextProgressAt: 0,
         callbacks,
+        readOnly: Boolean(options.readOnly),
+        fileChanges: new Map(),
         resolve,
         reject,
       };
@@ -156,15 +178,18 @@ export class CodexAppServerClient {
         threadId,
         input: [{ type: "text", text: options.prompt, text_elements: [] }],
         cwd: options.cwd,
-        approvalPolicy: "untrusted",
+        approvalPolicy: options.readOnly ? "never" : "untrusted",
         approvalsReviewer: "user",
-        sandboxPolicy: {
-          type: "workspaceWrite",
-          writableRoots: [options.cwd],
-          networkAccess: false,
-          excludeTmpdirEnvVar: false,
-          excludeSlashTmp: false,
-        },
+        ...(options.outputSchema ? { outputSchema: options.outputSchema } : {}),
+        sandboxPolicy: options.readOnly
+          ? { type: "readOnly", networkAccess: false }
+          : {
+              type: "workspaceWrite",
+              writableRoots: [options.cwd],
+              networkAccess: false,
+              excludeTmpdirEnvVar: false,
+              excludeSlashTmp: false,
+            },
       })) as { turn?: { id?: string } };
       const turnId = startedTurn.turn?.id;
       if (!turnId) throw new Error("Codex turn/start returned no turn id");
@@ -204,7 +229,7 @@ export class CodexAppServerClient {
   private request(method: string, params: JsonObject): Promise<unknown> {
     const id = this.nextRequestId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { method, resolve, reject });
       this.write({ id, method, params });
     });
   }
@@ -235,6 +260,12 @@ export class CodexAppServerClient {
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
+      // Establish the identity synchronously before readline dispatches the
+      // next notification from this same stdout chunk.
+      if (pending.method === "turn/start" && this.activeTurn) {
+        const turnId = asObject(asObject(message.result).turn).id;
+        if (typeof turnId === "string") this.activeTurn.turnId = turnId;
+      }
       if (message.error)
         pending.reject(new Error(formatUnknown(message.error)));
       else pending.resolve(message.result);
@@ -257,9 +288,15 @@ export class CodexAppServerClient {
   private handleNotification(method: string, params: JsonObject): void {
     const turn = this.activeTurn;
     if (!turn) return;
-    if (typeof params.turnId === "string") {
-      if (turn.turnId && params.turnId !== turn.turnId) return;
-      turn.turnId ??= params.turnId;
+    if (
+      typeof params.threadId === "string" &&
+      params.threadId !== turn.threadId
+    )
+      return;
+    const notificationTurnId = params.turnId ?? asObject(params.turn).id;
+    if (typeof notificationTurnId === "string") {
+      if (turn.turnId && notificationTurnId !== turn.turnId) return;
+      turn.turnId ??= notificationTurnId;
     }
     if (
       method === "item/agentMessage/delta" &&
@@ -285,6 +322,15 @@ export class CodexAppServerClient {
           `${method.endsWith("started") ? "Running" : "Finished"}: ${item.command.slice(0, 300)}`,
         );
       } else if (type === "fileChange") {
+        if (typeof item.id === "string" && Array.isArray(item.changes)) {
+          const details = item.changes
+            .map((value) => {
+              const change = asObject(value);
+              return `${String(change.path ?? "(unknown path)")}\n${String(change.diff ?? "(no diff supplied)")}`;
+            })
+            .join("\n\n");
+          turn.fileChanges.set(item.id, truncateText(details, 30_000));
+        }
         turn.callbacks.onProgress(
           method.endsWith("started")
             ? "Preparing code changes."
@@ -326,11 +372,16 @@ export class CodexAppServerClient {
     if (typeof id !== "number" && typeof id !== "string") return;
     const active = this.activeTurn;
     const detail =
+      (typeof params.itemId === "string" &&
+        active?.fileChanges.get(params.itemId)) ||
       (typeof params.command === "string" && params.command) ||
       (typeof params.reason === "string" && params.reason) ||
       formatUnknown(params.permissions ?? params);
-    active?.callbacks.onWaitingOwner(`${method}: ${detail}`.slice(0, 1_000));
-    const approved = await this.askOwner(method, detail);
+    if (!active?.readOnly)
+      active?.callbacks.onWaitingOwner(`${method}: ${detail}`.slice(0, 1_000));
+    const approved = active?.readOnly
+      ? false
+      : await this.askOwner(method, detail);
     let result: JsonObject;
     if (method === "item/commandExecution/requestApproval") {
       result = { decision: approved ? "accept" : "decline" };

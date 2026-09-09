@@ -55,6 +55,100 @@ afterEach(async () => {
 });
 
 describe("GitWorkspace recovery", () => {
+  it("publishes exactly the independently reviewed tree without re-running tests", async () => {
+    const { settings, workspace, remote } = await fixture();
+    const prepared = await workspace.prepare("project", settings);
+    await writeFile(join(prepared.path, "README.md"), "reviewed behavior\n");
+    const tree = await workspace.snapshotTree(prepared);
+    const head = await workspace.head(prepared);
+    const published = await workspace.publish(prepared, {
+      taskId: "verified-pass",
+      requester: "Member",
+      agent: "Reviewer",
+      sharedBranch: settings.sharedBranch,
+      expectedTreeSha: tree,
+      expectedHeadSha: head,
+    });
+    expect(
+      await checkedCommand(
+        "git",
+        ["rev-parse", `${published.commitSha}^{tree}`],
+        remote,
+      ),
+    ).toBe(tree);
+    expect(
+      await checkedCommand("git", ["rev-parse", settings.sharedBranch], remote),
+    ).toBe(published.commitSha);
+  });
+
+  it("preserves edits and refuses publication when files change after acceptance", async () => {
+    const { settings, workspace, remote } = await fixture();
+    const prepared = await workspace.prepare("project", settings);
+    await writeFile(join(prepared.path, "README.md"), "reviewed version\n");
+    const tree = await workspace.snapshotTree(prepared);
+    await writeFile(
+      join(prepared.path, "README.md"),
+      "unexpected later edit\n",
+    );
+    await expect(
+      workspace.publish(prepared, {
+        taskId: "verified-write",
+        requester: "Member",
+        agent: "Reviewer",
+        sharedBranch: settings.sharedBranch,
+        expectedTreeSha: tree,
+      }),
+    ).rejects.toThrow("changed after independent review");
+    expect(await workspace.head(prepared)).toBe(prepared.baselineSha);
+    expect(await readFile(join(prepared.path, "README.md"), "utf8")).toBe(
+      "unexpected later edit\n",
+    );
+    await expect(
+      checkedCommand("git", ["rev-parse", settings.sharedBranch], remote),
+    ).rejects.toThrow();
+  });
+
+  it("preserves a checkpoint's clean baseline instead of resetting an interrupted goal", async () => {
+    const { settings, workspace } = await fixture();
+    const prepared = await workspace.prepare("project", settings);
+    const recovered = await workspace.prepare("project", settings, {
+      recoverTaskId: "verified-clean",
+      recoverBaselineSha: prepared.baselineSha,
+    });
+    expect(recovered.baselineSha).toBe(prepared.baselineSha);
+    expect(await workspace.head(recovered)).toBe(prepared.baselineSha);
+  });
+
+  it("rejects a commit hook that substitutes unreviewed code before the push", async () => {
+    const { settings, workspace, remote } = await fixture();
+    const prepared = await workspace.prepare("project", settings);
+    await writeFile(
+      join(prepared.path, "README.md"),
+      "independently reviewed\n",
+    );
+    const tree = await workspace.snapshotTree(prepared);
+    await writeFile(
+      join(prepared.path, ".git", "hooks", "pre-commit"),
+      "#!/bin/sh\nprintf 'unreviewed hook change\\n' > README.md\ngit add README.md\n",
+      { mode: 0o755 },
+    );
+    await expect(
+      workspace.publish(prepared, {
+        taskId: "verified-hook",
+        requester: "Member",
+        agent: "Reviewer",
+        sharedBranch: settings.sharedBranch,
+        expectedTreeSha: tree,
+      }),
+    ).rejects.toThrow("changed after independent review");
+    await expect(
+      checkedCommand("git", ["rev-parse", settings.sharedBranch], remote),
+    ).rejects.toThrow();
+    expect(await readFile(join(prepared.path, "README.md"), "utf8")).toBe(
+      "unreviewed hook change\n",
+    );
+  });
+
   it("keeps dirty edits for the same task and creates an auditable commit", async () => {
     const { settings, workspace } = await fixture();
     const prepared = await workspace.prepare("project", settings);
@@ -150,6 +244,52 @@ describe("GitWorkspace recovery", () => {
         prepared.path,
       ),
     ).toBe(preservedSha);
+  });
+
+  it("preserves the published commit when recovery verification changes files", async () => {
+    const { settings, workspace } = await fixture();
+    const prepared = await workspace.prepare("project", settings);
+    const details = {
+      taskId: "task-published",
+      requester: "Requester",
+      agent: "Agent",
+      testCommand: "",
+      sharedBranch: settings.sharedBranch,
+    };
+    // Test tools can update snapshots or generated files during verification.
+    // This command only references fixture-local paths and contains no shell
+    // interpolation; it works with both cmd.exe and POSIX shells.
+    await writeFile(
+      join(prepared.path, "verify.cjs"),
+      'require("node:fs").writeFileSync("README.md", "verification changed me\\n"); console.log("verification ran");',
+    );
+    const published = await workspace.finish(prepared, details);
+    const recovered = await workspace.prepare("project", settings, {
+      recoverTaskId: details.taskId,
+    });
+    expect(recovered.taskCommitAlreadyPublished).toBe(true);
+    await expect(
+      workspace.finish(recovered, {
+        ...details,
+        testCommand: "node verify.cjs",
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("already published task checkout"),
+      testOutput: "verification ran",
+    });
+    expect(
+      await checkedCommand("git", ["rev-parse", "HEAD"], prepared.path),
+    ).toBe(published.commitSha);
+    expect(
+      await checkedCommand(
+        "git",
+        ["rev-parse", `origin/${settings.sharedBranch}`],
+        prepared.path,
+      ),
+    ).toBe(published.commitSha);
+    expect(await readFile(join(prepared.path, "README.md"), "utf8")).toBe(
+      "verification changed me\n",
+    );
   });
 
   it("only discards preserved commits through explicit reset", async () => {

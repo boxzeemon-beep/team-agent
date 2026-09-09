@@ -8,7 +8,13 @@ import {
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { RunnerServerMessage, Task } from "@team-agent/shared";
+import {
+  GOAL_WORKFLOW_CAPABILITY,
+  type GoalBrief,
+  type GoalWorkflow,
+  type RunnerServerMessage,
+  type Task,
+} from "@team-agent/shared";
 import type { LightMyRequestResponse } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
@@ -165,12 +171,17 @@ class TestRunner {
     });
   }
 
-  async registerWithPairing(pairingToken: string, deviceId: string) {
+  async registerWithPairing(
+    pairingToken: string,
+    deviceId: string,
+    capabilities: string[] = [],
+  ) {
     this.send({
       type: "runner.register",
       pairingToken,
       deviceId,
       displayName: "test",
+      capabilities,
     });
     return this.waitFor(
       (
@@ -182,12 +193,17 @@ class TestRunner {
     );
   }
 
-  async registerWithToken(runnerToken: string, deviceId: string) {
+  async registerWithToken(
+    runnerToken: string,
+    deviceId: string,
+    capabilities: string[] = [],
+  ) {
     this.send({
       type: "runner.register",
       runnerToken,
       deviceId,
       displayName: "test",
+      capabilities,
     });
     return this.waitFor(
       (
@@ -214,12 +230,13 @@ async function createTask(
   cookie: string,
   agentId: string,
   prompt: string,
+  brief?: GoalBrief,
 ): Promise<Task> {
   const response = await runtime.app.inject({
     method: "POST",
     url: "/api/tasks",
     headers: { cookie },
-    payload: { agentId, prompt },
+    payload: { agentId, prompt, ...(brief ? { brief } : {}) },
   });
   expect(response.statusCode).toBe(201);
   return response.json() as Task;
@@ -543,7 +560,7 @@ describe("coordinator", () => {
     }
   });
 
-  it("returns a one-command Runner pairing flow from the public release", async () => {
+  it("returns shell-specific source pairing and a safely quoted legacy release command", async () => {
     const runtime = await startRuntime();
     const { cookie } = await claimBootstrap(runtime, "Alice");
     const response = await runtime.app.inject({
@@ -557,7 +574,11 @@ describe("coordinator", () => {
       "releases/latest/download/team-agent-runner.tgz",
     );
     expect(response.json().command).toContain("team-agent runner");
-    expect(response.json().command).toContain("Alice's Codex");
+    expect(response.json().command).toContain(`'Alice'"'"'s Codex'`);
+    expect(response.json().sourceCommands).toEqual({
+      powershell: `node apps/runner/dist/cli.js runner --coordinator 'http://127.0.0.1:4310' --pair '${response.json().pairingToken}' --name 'Alice''s Codex'`,
+      posix: `node apps/runner/dist/cli.js runner --coordinator 'http://127.0.0.1:4310' --pair '${response.json().pairingToken}' --name 'Alice'"'"'s Codex'`,
+    });
   });
 
   it("serves nested web assets and uses the SPA fallback only outside the API", async () => {
@@ -984,7 +1005,7 @@ describe("coordinator", () => {
         projectName: "Changed after assignment",
         repositoryUrl: "git@example.invalid:team/project.git",
         baseBranch: "main",
-        sharedBranch: "internal-alpha",
+        sharedBranch: "changed-after-assignment",
         testCommand: "pnpm test",
       },
     });
@@ -1021,8 +1042,127 @@ describe("coordinator", () => {
     expect(
       runtime.db.agentById(registrationA.agentId)?.lastContextMessageSequence,
     ).toBe(replay.assignment.contextThroughSequence);
+    expect(runtime.db.taskById(active.id)?.messages.at(-1)?.content).toContain(
+      `Completed on ${original.assignment.settings.sharedBranch} at commit`,
+    );
+    expect(
+      runtime.db.taskById(active.id)?.messages.at(-1)?.content,
+    ).not.toContain("changed-after-assignment");
     await resumed.close();
     await runnerB.close();
+  });
+
+  it("rejects stale messages from a replaced Runner without releasing its active task", async () => {
+    const runtime = await startRuntime();
+    const { cookie } = await claimBootstrap(runtime);
+    const original = await TestRunner.connect(runtime.baseUrl);
+    const registration = await original.registerWithPairing(
+      await createPairing(runtime, cookie, "Owner"),
+      "replacement-device",
+    );
+    const active = await createTask(
+      runtime,
+      cookie,
+      registration.agentId,
+      "Work in progress",
+    );
+    const replacement = await TestRunner.connect(runtime.baseUrl);
+    // Hold the old transport open to make in-flight frames during the close
+    // handshake deterministic instead of relying on network timing.
+    const close = WebSocket.prototype.close;
+    const delayedClose = vi
+      .spyOn(WebSocket.prototype, "close")
+      .mockImplementation(function (
+        this: WebSocket,
+        code?: number,
+        data?: string | Buffer,
+      ) {
+        if (code !== 4001) close.call(this, code, data);
+      });
+    try {
+      await replacement.registerWithToken(
+        registration.runnerToken,
+        "replacement-device",
+      );
+      await replacement.waitFor(
+        (
+          message,
+        ): message is Extract<RunnerServerMessage, { type: "task.assign" }> =>
+          message.type === "task.assign" &&
+          message.assignment.taskId === active.id,
+      );
+      original.send({
+        type: "task.complete",
+        taskId: active.id,
+        result: "Stale completion",
+        diff: "",
+        testOutput: "",
+        commitSha: "a".repeat(40),
+        contextThroughSequence: 0,
+      });
+      // The error response is a processing barrier for the preceding stale
+      // completion, without arbitrary sleeps or assumptions about DB timing.
+      original.send({ type: "unsupported" });
+      await original.waitFor(
+        (
+          message,
+        ): message is Extract<RunnerServerMessage, { type: "runner.error" }> =>
+          message.type === "runner.error",
+      );
+      expect(runtime.db.taskById(active.id)?.status).toBe("running");
+      expect(runtime.db.hasActiveTask()).toBe(true);
+      replacement.send({
+        type: "task.complete",
+        taskId: active.id,
+        result: "Current completion",
+        diff: "",
+        testOutput: "passed",
+        commitSha: "b".repeat(40),
+        contextThroughSequence: 0,
+      });
+      await eventually(() => {
+        expect(runtime.db.taskById(active.id)?.result).toBe(
+          "Current completion",
+        );
+        expect(runtime.db.hasActiveTask()).toBe(false);
+      });
+    } finally {
+      delayedClose.mockRestore();
+      await original.close();
+      await replacement.close();
+    }
+  });
+
+  it("prevents a registered socket from rebinding to another Agent", async () => {
+    const runtime = await startRuntime();
+    const { cookie } = await claimBootstrap(runtime);
+    const runner = await TestRunner.connect(runtime.baseUrl);
+    const first = await runner.registerWithPairing(
+      await createPairing(runtime, cookie, "First owner"),
+      "first-device",
+    );
+    const otherPairing = await createPairing(runtime, cookie, "Second owner");
+    runner.send({
+      type: "runner.register",
+      pairingToken: otherPairing,
+      deviceId: "second-device",
+      displayName: "test",
+    });
+    const error = await runner.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "runner.error" }> =>
+        message.type === "runner.error",
+    );
+    expect(error.message).toContain("already registered");
+    await runner.close();
+    await eventually(() =>
+      expect(runtime.db.agentById(first.agentId)?.status).toBe("offline"),
+    );
+    // Rejected re-registration must not consume the second owner's pairing.
+    const other = await TestRunner.connect(runtime.baseUrl);
+    await other.registerWithPairing(otherPairing, "second-device");
+    await other.close();
   });
 
   it("lets the selected Agent owner prepare an attention task for retry", async () => {
@@ -1254,5 +1394,300 @@ describe("coordinator", () => {
       ).toBe(resumedAssignment.assignment.contextThroughSequence);
     });
     await resumedRunner.close();
+  });
+});
+
+describe("verified goal wire protocol", () => {
+  const brief: GoalBrief = {
+    mode: "verified",
+    context: "Keyboard access",
+    acceptanceCriteria: ["Keyboard opens details"],
+    maxIterations: 2,
+  };
+  const passedWorkflow = (): GoalWorkflow => ({
+    phase: "publishing",
+    iteration: 1,
+    maxIterations: 2,
+    sequence: 1,
+    testStatus: "passed",
+    reviews: [
+      {
+        iteration: 1,
+        verdict: "pass",
+        summary: "Checked keyboard access",
+        checks: [
+          {
+            criterion: "Keyboard opens details",
+            status: "pass",
+            evidence: "Keyboard integration test passed",
+          },
+        ],
+        issues: [],
+        reviewedTreeSha: "a".repeat(40),
+      },
+    ],
+  });
+
+  it("keeps a retried goal isolated from late terminal and progress messages from the previous run", async () => {
+    const runtime = await startRuntime();
+    const { cookie } = await claimBootstrap(runtime);
+    const runner = await TestRunner.connect(runtime.baseUrl);
+    const registration = await runner.registerWithPairing(
+      await createPairing(runtime, cookie, "Retry Agent"),
+      "retry-goal-device",
+      [GOAL_WORKFLOW_CAPABILITY],
+    );
+    const goal = await createTask(
+      runtime,
+      cookie,
+      registration.agentId,
+      "Retry goal",
+      brief,
+    );
+    await runner.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "task.assign" }> =>
+        message.type === "task.assign" && message.assignment.taskId === goal.id,
+    );
+    runner.send({
+      type: "task.needs_attention",
+      taskId: goal.id,
+      runId: goal.runId,
+      message: "First run needs repair",
+      diff: "first diff",
+      testOutput: "first test failure",
+    });
+    await eventually(() =>
+      expect(runtime.db.taskById(goal.id)?.status).toBe("needs_attention"),
+    );
+    const response = await runtime.app.inject({
+      method: "POST",
+      url: `/api/tasks/${goal.id}/retry`,
+      headers: { cookie },
+    });
+    expect(response.statusCode).toBe(200);
+    const retried = response.json() as Task;
+    expect(retried.runId).not.toBe(goal.runId);
+    const resumed = await runtime.app.inject({
+      method: "POST",
+      url: `/api/agents/${registration.agentId}/resume`,
+      headers: { cookie },
+    });
+    expect(resumed.statusCode).toBe(200);
+    await runner.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "task.assign" }> =>
+        message.type === "task.assign" &&
+        message.assignment.runId === retried.runId,
+    );
+    runner.send({
+      type: "task.complete",
+      taskId: goal.id,
+      runId: goal.runId,
+      result: "Old complete",
+      diff: "",
+      testOutput: "",
+      commitSha: "b".repeat(40),
+      contextThroughSequence: 0,
+    });
+    runner.send({
+      type: "task.needs_attention",
+      taskId: goal.id,
+      runId: goal.runId,
+      message: "Old failure",
+    });
+    runner.send({
+      type: "task.waiting_owner",
+      taskId: goal.id,
+      runId: goal.runId,
+      message: "Old waiting",
+    });
+    runner.send({
+      type: "task.progress",
+      taskId: goal.id,
+      message: "Missing run identifier",
+    });
+    runner.send({ type: "unsupported-processing-barrier" });
+    await runner.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "runner.error" }> =>
+        message.type === "runner.error" &&
+        message.message === "Invalid runner message",
+    );
+    expect(runtime.db.taskById(goal.id)).toMatchObject({
+      status: "running",
+      runId: retried.runId,
+      error: "",
+      result: "",
+      diff: "",
+      testOutput: "",
+    });
+    expect(
+      runtime.db
+        .taskById(goal.id)
+        ?.messages.some((message) => message.content.includes("first diff")),
+    ).toBe(true);
+    await runner.close();
+  });
+
+  it("gates legacy runners while still scheduling direct work, then rejects unchecked or stale completion", async () => {
+    const runtime = await startRuntime();
+    const { cookie } = await claimBootstrap(runtime);
+    const legacy = await TestRunner.connect(runtime.baseUrl);
+    const registration = await legacy.registerWithPairing(
+      await createPairing(runtime, cookie, "Goal Agent"),
+      "goal-device",
+    );
+    const goal = await createTask(
+      runtime,
+      cookie,
+      registration.agentId,
+      "Goal",
+      brief,
+    );
+    expect(runtime.db.taskById(goal.id)).toMatchObject({
+      status: "waiting_for_agent",
+      brief,
+    });
+    expect(runtime.db.taskById(goal.id)?.progress).toContain(
+      "goal-workflow-v1",
+    );
+    const direct = await createTask(
+      runtime,
+      cookie,
+      registration.agentId,
+      "Direct compatible task",
+    );
+    await legacy.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "task.assign" }> =>
+        message.type === "task.assign" &&
+        message.assignment.taskId === direct.id,
+    );
+    expect(
+      legacy.received.some(
+        (message) =>
+          message.type === "task.assign" &&
+          message.assignment.taskId === goal.id,
+      ),
+    ).toBe(false);
+    legacy.send({
+      type: "task.complete",
+      taskId: direct.id,
+      result: "Direct complete",
+      diff: "",
+      testOutput: "",
+      commitSha: "a".repeat(40),
+      contextThroughSequence: 0,
+    });
+    await eventually(() =>
+      expect(runtime.db.taskById(direct.id)?.status).toBe("completed"),
+    );
+    await legacy.close();
+    const current = await TestRunner.connect(runtime.baseUrl);
+    await current.registerWithToken(registration.runnerToken, "goal-device", [
+      GOAL_WORKFLOW_CAPABILITY,
+    ]);
+    const assigned = await current.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "task.assign" }> =>
+        message.type === "task.assign" && message.assignment.taskId === goal.id,
+    );
+    expect(assigned.assignment.brief).toEqual(brief);
+    expect(assigned.assignment.runId).toBe(goal.runId);
+    const completion = {
+      type: "task.complete",
+      taskId: goal.id,
+      runId: goal.runId,
+      result: "Verified",
+      diff: "",
+      testOutput: "passed",
+      commitSha: "b".repeat(40),
+      contextThroughSequence: 0,
+    };
+    current.send(completion);
+    await current.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "runner.error" }> =>
+        message.type === "runner.error" &&
+        message.message.includes("completion rejected"),
+    );
+    expect(runtime.db.taskById(goal.id)?.status).toBe("running");
+    current.send({
+      type: "task.progress",
+      taskId: goal.id,
+      runId: "obsolete-run",
+      message: "stale text",
+    });
+    await current.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "runner.error" }> =>
+        message.type === "runner.error" &&
+        message.message.includes("does not match"),
+    );
+    expect(runtime.db.taskById(goal.id)?.progress).not.toBe("stale text");
+    current.send({
+      type: "task.workflow",
+      taskId: goal.id,
+      runId: goal.runId,
+      workflow: passedWorkflow(),
+    });
+    await eventually(() =>
+      expect(runtime.db.taskById(goal.id)?.workflow?.sequence).toBe(1),
+    );
+    current.send({
+      type: "task.workflow",
+      taskId: goal.id,
+      runId: goal.runId,
+      workflow: { ...passedWorkflow(), testStatus: "failed" },
+    });
+    await current.waitFor(
+      (
+        message,
+      ): message is Extract<RunnerServerMessage, { type: "runner.error" }> =>
+        message.type === "runner.error" &&
+        message.message.includes("stale or inconsistent"),
+    );
+    current.send(completion);
+    await eventually(() =>
+      expect(runtime.db.taskById(goal.id)?.status).toBe("completed"),
+    );
+    await current.close();
+  });
+
+  it("runs the same simulated review/revision contract through Coordinator demo persistence", async () => {
+    const runtime = await startRuntime(undefined, {
+      demoMode: true,
+      demoStepDelayMs: 2,
+    });
+    await eventually(() => expect(runtime.db.hasActiveTask()).toBe(false));
+    const agent = runtime.db
+      .listAgents()
+      .find((candidate) => candidate.status === "online");
+    if (!agent) throw new Error("Expected online demo agent");
+    const goal = await createTask(runtime, "", agent.id, "Demo goal", brief);
+    await eventually(() =>
+      expect(runtime.db.taskById(goal.id)?.status).toBe("completed"),
+    );
+    expect(
+      runtime.db
+        .taskById(goal.id)
+        ?.workflow?.reviews.map((review) => review.verdict),
+    ).toEqual(["revise", "pass"]);
+    const blocked = await createTask(runtime, "", agent.id, "Demo limit", {
+      ...brief,
+      maxIterations: 1,
+    });
+    await eventually(() =>
+      expect(runtime.db.taskById(blocked.id)?.status).toBe("needs_attention"),
+    );
+    expect(runtime.db.taskById(blocked.id)?.workflow?.phase).toBe("blocked");
   });
 });

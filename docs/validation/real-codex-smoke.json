@@ -1,0 +1,17 @@
+{
+  "actualImplementation": "exports.sum = (a, b) => a + b;",
+  "actualTestOutput": "3 sum assertions passed",
+  "testFileUnchanged": true,
+  "localHead": "695a5491c0ae87d39e4da179c57bdcc46b30eeb8",
+  "baselineSha": "695a5491c0ae87d39e4da179c57bdcc46b30eeb8",
+  "reviewedTreeSha": "0ac846f897a3d296603216b45e998f94b2971d3d",
+  "remoteRefs": "695a5491c0ae87d39e4da179c57bdcc46b30eeb8 refs/heads/main",
+  "workflowPhase": "blocked",
+  "implementationThread": "01a08514-ca55-7c82-a037-5216bb25fccc",
+  "independentReadOnlyThread": "01a08516-b7b5-7d52-8471-c50925eb7952",
+  "published": false,
+  "limitSeconds": 260,
+  "outcome": "Implementation and actual tests succeeded. Independent review did not return acceptance JSON before the harness deadline after repeated model response WebSocket timeouts; publication remained blocked.",
+  "testFileGitBlob": "6502f128f805e5abb2a494c072fe482fea1f611e",
+  "byteComparisonNote": "Git blob equality confirms test.cjs is unchanged; Windows checkout converted LF/CRLF, so raw seed and checkout file hashes differ."
+}

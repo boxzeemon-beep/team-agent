@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createApp } from "./server.js";
 
 export { CoordinatorDatabase } from "./database.js";
@@ -23,7 +25,8 @@ async function main(): Promise<void> {
 }
 
 const launchedDirectly =
-  process.argv[1] && new URL(import.meta.url).pathname === process.argv[1];
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (launchedDirectly)
   main().catch((error) => {
     console.error(error);

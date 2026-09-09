@@ -27,6 +27,7 @@
     "runner": "tsx apps/runner/src/cli.ts",
     "doctor": "tsx apps/runner/src/cli.ts doctor",
     "demo:playground": "tsx scripts/demo-playground.ts",
+    "demo:browser": "pnpm --filter @team-agent/coordinator exec vite --mode pages --host 127.0.0.1 --port 4321 --strictPort",
     "demo:smoke": "tsx examples/smoke-demo/run.ts",
     "runner:built": "node apps/runner/dist/cli.js"
   },
