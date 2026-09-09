@@ -50,7 +50,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: "same-origin",
   });
   if (!response.ok) {
-    let message = `请求失败（${response.status}）`;
+    let message = `Request failed (${response.status})`;
     try {
       const body = (await response.json()) as {
         message?: string;
@@ -70,7 +70,8 @@ export const getSnapshot = () => api<DashboardSnapshot>("/api/snapshot");
 
 /** Restores only this browser demo's own storage entry, never other site data. */
 export function resetDemo(): void {
-  if (!isStaticDemo) throw new ApiError("仅浏览器演示支持重置。", 403);
+  if (!isStaticDemo)
+    throw new ApiError("Reset is only available in the browser demo.", 403);
   getDemoEngine().reset();
 }
 

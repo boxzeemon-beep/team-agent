@@ -186,7 +186,7 @@ export async function createApp(
 
   const demoResult = (task: Task) => ({
     result:
-      "[DEMO RESULT] 模拟 Agent 已完成任务；未调用 Codex，也未读写或推送 Git 仓库。",
+      "[DEMO RESULT] The simulated Agent completed the example. No Codex session or Git read, write or push occurred.",
     diff: [
       "[DEMO DIFF — SIMULATED, NO FILES CHANGED]",
       "--- a/src/demo-feature.ts",
@@ -330,7 +330,7 @@ export async function createApp(
           null,
           agent.displayName,
           "agent",
-          "[DEMO] 已进入模拟执行阶段。",
+          "[DEMO] Simulated execution has started.",
         );
         broadcast();
       }
@@ -556,7 +556,7 @@ export async function createApp(
       typeof (request.body as { displayName?: unknown })?.displayName ===
       "string"
         ? (request.body as { displayName: string }).displayName.trim()
-        : `${member.name}的 Codex`;
+        : `${member.name}'s Codex`;
     if (!displayName || displayName.length > 80)
       return reply.code(400).send({ error: "invalid_display_name" });
     const raw = token();

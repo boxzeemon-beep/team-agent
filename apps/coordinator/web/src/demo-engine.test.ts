@@ -93,10 +93,10 @@ describe("browser demonstration state machine", () => {
     expect(completed.status).toBe("completed");
     expect(canCompleteGoal(brief, completed.workflow)).toBe(true);
     expect(completed.commitSha).toBe("");
-    expect(completed.testOutput).toContain("模拟测试输出");
+    expect(completed.testOutput).toContain("SIMULATED TEST OUTPUT");
     expect(
       completed.workflow?.reviews[1]?.checks.every((check) =>
-        check.evidence.includes("模拟证据"),
+        check.evidence.includes("SIMULATED EVIDENCE"),
       ),
     ).toBe(true);
   });
@@ -170,7 +170,7 @@ describe("browser demonstration state machine", () => {
     vi.runAllTimers();
     expect(task(engine, second.id).status).toBe("completed");
     expect(task(engine, second.id).result).toContain(
-      "与本次自由输入的需求无关",
+      "does not implement your request",
     );
     expect(task(engine, second.id).commitSha).toBe("");
     unsubscribe();
@@ -235,13 +235,15 @@ describe("browser demonstration state machine", () => {
     const retried = task(engine, "demo-task-retry");
     expect(retried.status).toBe("needs_attention");
     expect(
-      retried.messages.some((message) => message.content.includes("模拟失败")),
+      retried.messages.some((message) =>
+        message.content.includes("SIMULATED FAILURE"),
+      ),
     ).toBe(true);
-    expect(retried.error).toContain("轮次上限");
+    expect(retried.error).toContain("round limit");
     expect(retried.workflow?.phase).toBe("blocked");
     expect(
       retried.messages.some((message) =>
-        message.content.includes("模拟历史证据"),
+        message.content.includes("SIMULATED HISTORY"),
       ),
     ).toBe(true);
   });
@@ -259,7 +261,7 @@ describe("browser demonstration state machine", () => {
     first.dispose();
     const restored = start(storage);
     expect(task(restored, created.id).status).toBe("queued");
-    expect(task(restored, created.id).progress).toContain("页面已恢复");
+    expect(task(restored, created.id).progress).toContain("Page restored");
     expect(
       task(restored, created.id).messages.some(
         (item) => item.id === message.id,
@@ -270,7 +272,7 @@ describe("browser demonstration state machine", () => {
     expect(task(restored, created.id).status).toBe("completed");
     expect(
       task(restored, created.id).messages.filter((item) =>
-        item.content.includes("【固定示例 · 未执行真实开发】"),
+        item.content.includes("[FIXED EXAMPLE — NO LIVE DEVELOPMENT]"),
       ),
     ).toHaveLength(1);
   });
@@ -353,23 +355,23 @@ describe("browser demonstration state machine", () => {
   it("rejects malformed requests, forbidden management and invalid state transitions", () => {
     const engine = start();
     expect(() => engine.request("/api/tasks", post({ prompt: " " }))).toThrow(
-      "任务描述",
+      "Task description",
     );
     expect(() =>
       engine.request("/api/tasks", { method: "POST", body: "null" }),
-    ).toThrow("JSON 对象");
+    ).toThrow("JSON object");
     expect(() => engine.request("/api/invites", post())).toThrow(
-      "真实 Coordinator",
+      "real Coordinator",
     );
     expect(() =>
       engine.request("/api/tasks/demo-task-cleanup/retry", post()),
-    ).toThrow("仅需要处理");
+    ).toThrow("Only tasks needing attention");
     expect(() =>
       engine.request("/api/tasks/demo-task-cleanup/cancel", post()),
-    ).toThrow("已结束");
+    ).toThrow("already ended");
     expect(() =>
       engine.request("/api/tasks/demo-task-login/cancel", post()),
-    ).toThrow("只有任务发布者");
+    ).toThrow("Only the task requester");
   });
 });
 

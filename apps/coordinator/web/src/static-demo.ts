@@ -12,8 +12,8 @@ export { advanceSimulatedGoal };
 /** Hand-written fixtures, never generated work or real test output. */
 export const staticDemoResult = {
   result:
-    "【固定示例 · 未执行真实开发】你已走完任务排队、执行与审查流程。下面展示的是预先编写的任务卡片可访问性示例，与本次自由输入的需求无关；没有调用 Codex、运行测试或读写 Git。接入自己的 Coordinator 和 Runner 后，才能获得真实任务结果。",
-  diff: `# 模拟 diff · 预置可访问性示例，未修改任何文件
+    "[FIXED EXAMPLE — NO LIVE DEVELOPMENT] You have explored the queue, execution and review flow. This prewritten task-card accessibility example does not implement your request. No Codex session, tests or Git operations ran. Connect your own Coordinator and Runner to execute real work.",
+  diff: `# SIMULATED DIFF — fixed accessibility example; no files changed
 diff --git a/src/components/task-card.tsx b/src/components/task-card.tsx
 --- a/src/components/task-card.tsx
 +++ b/src/components/task-card.tsx
@@ -23,20 +23,20 @@ diff --git a/src/components/task-card.tsx b/src/components/task-card.tsx
 +    <button
 +      type="button"
 +      className="task-card"
-+      aria-label={\`查看任务：\${task.title}\`}
++      aria-label={\`Open task: \${task.title}\`}
 +      onClick={onSelect}
 +    >
        <span>{task.title}</span>
 -    </div>
 +    </button>
    );`,
-  testOutput: `【模拟测试输出 · 没有运行测试命令】
-固定示例：task-card.accessibility.test.tsx
-  ✓ Tab 可聚焦任务卡片
-  ✓ Enter 与 Space 均可打开详情
-  ✓ 辅助技术可读出任务名称
+  testOutput: `[SIMULATED TEST OUTPUT — no test command ran]
+Fixed example: task-card.accessibility.test.tsx
+  ✓ Tab focuses the task card
+  ✓ Enter and Space open task details
+  ✓ Assistive technology announces the task name
 
-示例用例 3/3 通过 · 该输出不验证你输入的需求`,
+3/3 illustrative checks passed — this output does not verify your request`,
   // Never manufacture a Git SHA for a browser-only demonstration.
   commitSha: "",
 };
@@ -48,23 +48,23 @@ export function createDemoSnapshot(now = Date.now()): DashboardSnapshot {
   const snapshot: DashboardSnapshot = {
     me: {
       id: "static-demo-visitor",
-      name: "试玩访客",
+      name: "Demo visitor",
       isAdmin: false,
       createdAt: stamp(150),
     },
     settings: {
-      projectName: "Team Agent 工作台",
+      projectName: "Team Agent Workbench",
       repositoryUrl: "simulated://browser-only",
       baseBranch: "main",
       sharedBranch: "team/workspace",
-      testCommand: "pnpm test（演示中不执行）",
+      testCommand: "pnpm test (not executed in the demo)",
     },
     agents: [
       {
         id: "static-agent-luna",
         ownerMemberId: "static-owner-lin",
         ownerName: "Lin",
-        displayName: "Luna · 前端开发",
+        displayName: "Luna · Frontend",
         status: "online",
         lastContextMessageSequence: 9,
         lastSeenAt: stamp(0),
@@ -73,7 +73,7 @@ export function createDemoSnapshot(now = Date.now()): DashboardSnapshot {
         id: "static-agent-forge",
         ownerMemberId: "static-owner-alex",
         ownerName: "Alex",
-        displayName: "Forge · 接口与服务",
+        displayName: "Forge · Backend",
         status: "online",
         lastContextMessageSequence: 6,
         lastSeenAt: stamp(0),
@@ -82,7 +82,7 @@ export function createDemoSnapshot(now = Date.now()): DashboardSnapshot {
         id: "static-agent-scout",
         ownerMemberId: "static-owner-mika",
         ownerName: "Mika",
-        displayName: "Scout · 代码审查",
+        displayName: "Scout · Code review",
         status: "offline",
         lastContextMessageSequence: 0,
         lastSeenAt: stamp(42),
@@ -127,9 +127,10 @@ export function createDemoSnapshot(now = Date.now()): DashboardSnapshot {
         sequence: ++sequence,
         taskId: id,
         memberId: null,
-        memberName: "演示系统",
+        memberName: "Demo system",
         role: "system",
-        content: "预置演示记录。对话、代码变更与测试结果均为手写示例。",
+        content:
+          "Prewritten demo record. Messages, code changes and test results are illustrative examples.",
         createdAt,
       },
       {
@@ -167,13 +168,13 @@ export function createDemoSnapshot(now = Date.now()): DashboardSnapshot {
   snapshot.tasks = [
     task(
       "demo-task-login",
-      "修复登录状态刷新后丢失的问题",
+      "Keep users signed in after a page refresh",
       1,
       "completed",
       68,
-      "模拟完成 · 登录会话与过期状态均已覆盖",
-      "【预置示例】刷新时先恢复会话，再决定是否跳转登录页。增加加载状态，避免已登录用户短暂看到登录表单；会话过期时保留当前页面地址。示例覆盖有效会话、过期会话和请求失败三条路径。所有变更与测试均为模拟记录。",
-      `# 模拟 diff · 未修改真实文件
+      "Simulated completion · session restoration and expiry covered",
+      "[PREWRITTEN EXAMPLE] Restore the session before deciding whether to redirect. A loading state prevents the sign-in form from flashing for authenticated users; an expired session preserves the return URL. The example covers valid sessions, expired sessions and request failures. All changes and tests are simulated.",
+      `# SIMULATED DIFF — no real files changed
 diff --git a/src/auth/session.ts b/src/auth/session.ts
 --- a/src/auth/session.ts
 +++ b/src/auth/session.ts
@@ -184,66 +185,66 @@ diff --git a/src/auth/session.ts b/src/auth/session.ts
 +  setStatus(session ? "signed-in" : "signed-out");
 +  return session;
  }`,
-      "【模拟测试输出】\n✓ 有效会话刷新后保留登录态\n✓ 过期会话跳转且保留返回地址\n✓ 网络错误显示重试入口\n\n3/3 示例用例通过；未实际执行。",
+      "[SIMULATED TEST OUTPUT]\n✓ A valid session survives a page refresh\n✓ An expired session redirects and preserves the return URL\n✓ A network error offers a retry action\n\n3/3 illustrative checks passed; not executed.",
     ),
     task(
       "demo-task-shortcuts",
-      "让任务卡片支持键盘操作与屏幕阅读器",
+      "Make task cards accessible by keyboard and screen reader",
       0,
       "completed",
       47,
-      "模拟完成 · Tab、Enter 与 Space 操作一致",
-      "【预置示例】将可点击容器改为原生 button，补充任务名称和可见焦点。键盘用户可以直接打开详情，屏幕阅读器能读出任务名称。以下代码与测试为固定示例，没有真实提交。",
+      "Simulated completion · consistent Tab, Enter and Space behavior",
+      "[PREWRITTEN EXAMPLE] Replace the clickable container with a native button, an accessible task name and visible focus. Keyboard users can open details and screen readers announce the task. The code and tests below are fixed examples, with no real commit.",
       staticDemoResult.diff,
       staticDemoResult.testOutput,
     ),
     task(
       "demo-task-empty-state",
-      "为空任务列表补充清晰的下一步引导",
+      "Give empty task lists a clear next step",
       0,
       "completed",
       31,
-      "模拟完成 · 区分暂无任务与筛选无结果",
-      "【预置示例】首次进入时展示“创建第一项任务”；筛选无结果时展示“清除筛选”。两种空状态分别解释原因并提供一个明确动作。没有改动真实仓库。",
-      `# 模拟 diff · 未修改真实文件
+      "Simulated completion · distinct empty and no-match states",
+      "[PREWRITTEN EXAMPLE] Show “Create your first task” for a new workspace and “Clear filters” when no tasks match. Each state explains why the list is empty and offers one next step. No real repository was changed.",
+      `# SIMULATED DIFF — no real files changed
 diff --git a/src/tasks/empty-state.tsx b/src/tasks/empty-state.tsx
 --- a/src/tasks/empty-state.tsx
 +++ b/src/tasks/empty-state.tsx
 @@ -3,2 +3,4 @@ export function EmptyState({ filtered }: Props) {
--  return <p>暂无数据</p>;
+-  return <p>No data</p>;
 +  return filtered
-+    ? <button onClick={clearFilters}>清除筛选</button>
-+    : <button onClick={openComposer}>创建第一项任务</button>;
++    ? <button onClick={clearFilters}>Clear filters</button>
++    : <button onClick={openComposer}>Create your first task</button>;
  }`,
-      "【模拟测试输出】\n✓ 初始空列表提供创建入口\n✓ 筛选无结果允许重置筛选\n\n2/2 示例用例通过；未实际执行。",
+      "[SIMULATED TEST OUTPUT]\n✓ A new empty list offers task creation\n✓ A no-match state offers a filter reset\n\n2/2 illustrative checks passed; not executed.",
     ),
     task(
       "demo-task-retry",
-      "为 API 超时增加有限重试与错误提示",
+      "Bound API retries and explain timeout failures",
       1,
       "needs_attention",
       19,
-      "模拟中断 · 等待重新排队",
+      "Simulation interrupted · ready to retry",
       "",
       "",
-      "【模拟测试输出】\n✓ 503 响应展示可重试提示\n✕ 第三次失败后应停止自动重试\n\n此失败为预置演示情境；点击“重新排队”可演示恢复流程。",
-      "【模拟失败】退避重试示例未通过上限检查。点击重新排队，观察恢复执行及固定示例结果。",
+      "[SIMULATED TEST OUTPUT]\n✓ A 503 response offers a retry action\n✓ The first retry respects the configured delay\n\n2/2 illustrative checks passed; no test command ran. The independent review still found an unmet acceptance criterion. Retry to explore the same one-round limit.",
+      "[SIMULATED FAILURE] The retry example failed its limit check. Retry to explore recovery within the original round limit.",
     ),
     task(
       "demo-task-contrast",
-      "检查暗色模式下的文字对比度与焦点可见性",
+      "Check text contrast and focus visibility in dark mode",
       2,
       "waiting_for_agent",
       11,
-      "Scout 当前离线。可改派给 Luna 或 Forge，立即体验队列调度。",
+      "Scout is offline. Reassign to Luna or Forge to explore the queue.",
     ),
     task(
       "demo-task-cleanup",
-      "清理导航栏中已弃用的实验入口",
+      "Remove retired experimental navigation links",
       0,
       "canceled",
       88,
-      "演示任务已取消 · 未产生代码变更",
+      "Demo task canceled · no code changes",
     ),
   ].reverse();
   const completed = snapshot.tasks.find(
@@ -255,15 +256,18 @@ diff --git a/src/tasks/empty-state.tsx b/src/tasks/empty-state.tsx
     fixture.brief = {
       mode: "verified",
       context:
-        "【预置演示】展示围绕验收标准的实现、测试、审查与修订闭环；没有真实仓库操作。",
+        "[PREWRITTEN DEMO] Explore implementation, testing, review and revision against agreed criteria. No real repository operations occur.",
       acceptanceCriteria:
         fixture === completed
           ? [
-              "Tab 可以聚焦任务卡片",
-              "Enter 与 Space 可打开任务详情",
-              "键盘焦点清晰可见",
+              "Tab can focus a task card",
+              "Enter and Space can open task details",
+              "Keyboard focus is clearly visible",
             ]
-          : ["API 失败后最多自动重试三次", "重试耗尽后显示明确错误提示"],
+          : [
+              "Failed API requests retry no more than three times",
+              "Show a clear error when retries are exhausted",
+            ],
       maxIterations: fixture === completed ? 2 : 1,
     };
     fixture.runId = `simulated-run-${fixture.id}`;
@@ -272,11 +276,11 @@ diff --git a/src/tasks/empty-state.tsx b/src/tasks/empty-state.tsx
       fixture.workflow = advanceSimulatedGoal(fixture.brief, fixture.workflow);
     fixture.progress =
       fixture === completed
-        ? "模拟目标完成 · 两轮实现、测试与逐项审查"
-        : "模拟目标受阻 · 第 1 轮审查未通过，已到轮次上限";
+        ? "Simulated goal completed · two rounds of implementation, tests and review"
+        : "Simulated goal blocked · first review failed at the one-round limit";
     if (fixture === failed)
       fixture.error =
-        "【模拟失败】达到 1 轮上限，验收标准尚未全部通过。可重新排队体验相同边界；创建 2 轮目标可体验修订后通过。";
+        "[SIMULATED FAILURE] The one-round limit was reached before all criteria passed. Retrying preserves that limit; create a two-round goal to explore revision and a passing review.";
   }
   return snapshot;
 }

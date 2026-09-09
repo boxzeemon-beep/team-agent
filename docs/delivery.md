@@ -1,77 +1,74 @@
-# Team Agent：2026-09-09 交付记录
+# Validation and delivery record — September 9, 2026
 
-本轮把原先的任务大厅重做为围绕目标与验收的工作台。核心变化是让实现、测试、独立审查、修订与提交推送有明确的通过条件，并把证据放到用户容易查看的位置。
+Team Agent's workbench rebuild adds explicit goals, acceptance criteria, bounded revision, fresh read-only review, and inspectable evidence to the existing Coordinator/Runner workflow. This document records what was actually checked and what remains unproven.
 
-本轮改动基于 `316f887a844e2381fef40f2a4486b0969eb91322`，发布范围为 `main` 源码与 [GitHub Pages 浏览器工作台](https://boxzeemon-beep.github.io/team-agent/)。Pages 提供固定模拟案例与交互，不托管真实 Coordinator，也不调用 Codex 或 Git。公开提交及 Pages 部署结果以 [GitHub 提交记录](https://github.com/boxzeemon-beep/team-agent/commits/main/)和 [Pages 工作流](https://github.com/boxzeemon-beep/team-agent/actions/workflows/pages.yml)为准。
+## Published source and browser demo
 
-本次不创建版本 tag 或 GitHub Release，不更新 Docker 镜像：`ghcr.io/boxzeemon-beep/team-agent:0.2.0`、`:latest` 与最新 Release Runner 仍属于 v0.2.0。新工作台及验收协议需要运行 `main` 源码或自行构建。README 中的历史截图和视频保留原版本标记；源码与 Pages 的发布不代表真实 Codex 完整验收成功，也不等于部署了团队服务。
+The rebuild started from `316f887a844e2381fef40f2a4486b0969eb91322` and was published on `main`, with the first workbench publication ending at [597c9de](https://github.com/boxzeemon-beep/team-agent/commit/597c9de5863436df5e20eefcff3f10ef28c8e34e).
 
-## 可以立即体验的成果
+That exact publication completed:
 
-在源码根目录运行：
+- [CI: Ubuntu/Windows × Node.js 22/24, plus workflow lint](https://github.com/boxzeemon-beep/team-agent/actions/runs/34336226380).
+- [CodeQL analysis](https://github.com/boxzeemon-beep/team-agent/actions/runs/34336226287).
+- [GitHub Pages build and deployment](https://github.com/boxzeemon-beep/team-agent/actions/runs/34336226258).
 
-```bash
-pnpm install --frozen-lockfile
-pnpm demo:browser
-```
+The public page and its JavaScript, CSS, and favicon returned HTTP 200 after deployment. Later changes, including English documentation and interface copy, should be checked against their own [CI runs](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml) and [Pages deployment](https://github.com/boxzeemon-beep/team-agent/actions/workflows/pages.yml), rather than attributed to the earlier commit's run.
 
-打开 [本地工作台](http://127.0.0.1:4321/team-agent/)。推荐先查看“让任务卡片支持键盘操作与屏幕阅读器”，阅读两轮验收和代码差异；然后新建一个两轮目标，观察第一轮需要修订、第二轮完成；最后在协作记录里写反馈，生成下一份可编辑目标草稿。
+[GitHub Pages](https://boxzeemon-beep.github.io/team-agent/) is a browser simulation. It does not host a real Coordinator or invoke Codex or Git. Current installation instructions use `main` source or a source-built container. This publication did not create a new version tag, GitHub Release, Docker image, or hosted team service; existing `:0.2.0`, `:latest`, and Release Runner artifacts belong to v0.2.0.
 
-**这一路径是明确标记的模拟演示。** 真实执行要运行 Coordinator、设置实际测试命令，并接入本版 Runner。真实服务端可用 `pnpm build` 后 `pnpm coordinator:built` 启动；界面会提供当前源码构建后的配对命令，并分别支持 PowerShell 7 和 POSIX 终端。配置方法见[使用指南](workbench.md)。
+## Implemented behavior
 
-## 已实装的关键行为
-
-| 使用问题 | 本版行为 |
+| Requirement | Implementation |
 | --- | --- |
-| 一句需求缺少背景与完成判断 | 目标、项目背景、1–12 条验收标准、1–3 轮上限一起保存；直接执行方式仍可选 |
-| 模型说完成，却看不出是否符合要求 | Runner 执行配置的实际测试，再新建只读 Codex 会话逐条审查；缺项、重复、unknown、坏 JSON、未解决问题都不能通过 |
-| 第一轮审查发现问题 | 在约定上限内带着证据修订，再次运行测试和新会话审查；用尽轮次或缺少证据进入待处理 |
-| 审查结束后代码发生变化 | 记录被审查的 Git tree，提交前后核对；只推送与已审查 tree 一致的明确 commit SHA |
-| 断线、重启或重试混入旧结果 | 冻结任务分配，持久化 runId 和检查点；旧 run 消息不能改写新执行；重试归档原证据 |
-| 结果需要进一步改进 | 反馈生成带来源、原有背景和结果的新草稿；新目标重新验收，长内容保留供编辑，超限不能提交 |
-| 日常查看与交接费力 | 重做桌面和手机布局、显式 Agent 选择、任务筛选搜索、逐文件 diff 与行号、测试原文、审查历史及 Markdown 导出 |
-| 新旧 Runner 混用 | verified 要求 `goal-workflow-v1`，旧 Runner 显示升级提示，仍能执行 direct 任务；接入页提供本版源码命令 |
+| Make completion explicit | Persist a goal, context, 1–12 criteria, and a 1–3 round limit; retain direct tasks |
+| Require evidence | Run the real configured test command, then a fresh read-only Codex review of every criterion |
+| Handle review failures | Revise within the agreed limit, retest and rereview, or retain evidence in an attention state |
+| Prevent unreviewed publication | Capture the reviewed Git tree, check tree/HEAD around commit, and push the matching immutable commit SHA |
+| Isolate recovery and retries | Freeze assignments, persist run IDs/checkpoints, reject late old-run messages, archive retry evidence |
+| Continue from feedback | Create an editable new goal with source context, preserving old results and requiring new acceptance |
+| Make results inspectable | Responsive UI, explicit Agent selection, filtering/search, file/hunk diffs, raw tests, review history, Markdown export |
+| Detect older Runners | Require `goal-workflow-v1` for verified goals while preserving direct-task compatibility |
 
-同一个项目继续串行写入共享分支。“独立审查”指同一 Runner 上的新只读会话，不代表另一台机器或另一种模型。发布指已有 Git 提交推送流程，不是部署应用或自动合并受保护分支。
+“Independent” review means a fresh read-only context on the same Runner. It does not mean another machine, another person, or a guaranteed different model. Publication means Git commit/push to the shared branch, not application deployment or automatic merge.
 
-## 最终检查结果
+## Local validation of the rebuild
 
-检查环境：Windows、Node.js 24.19.0、pnpm 11.19.0、Git 2.53.0。以下是本次实际执行结果。
+Environment: Windows, Node.js 24.19.0, pnpm 11.19.0, Git 2.53.0.
 
-| 检查 | 结果与范围 |
+| Check | Observed result and scope |
 | --- | --- |
-| `pnpm test` | **16 个测试文件，104 项通过**。覆盖 SQLite 恢复、真实 WebSocket 协议、旧运行隔离、验收门槛、有界修订、模拟恢复、Git 发布与恢复、草稿和导出等 |
-| `pnpm typecheck` | shared、Coordinator、Runner 全部通过 |
-| `pnpm lint` | 通过 |
-| `pnpm build` | Coordinator 前后端与 Runner 生产构建通过 |
-| `pnpm build:pages` | `/team-agent/` 路径的静态演示构建通过 |
-| `pnpm demo:smoke` | 通过。真实邀请、会话、配对、WebSocket、SQLite 与本地 Git 提交推送；Runner 行为为 mock，不调用模型 |
-| 本机 `pnpm run doctor` | Codex 已登录、app-server 握手、Git 和目录检查通过；不等同于模型生成成功 |
-| 浏览器人工检查 | 模拟两轮流程、历史审查、草稿刷新恢复、超长反馈保留与禁提交、Markdown 实际下载、桌面与 390px 布局；窄屏页面及详情没有横向内容溢出，详情标签允许局部滚动 |
-| 真实后端界面 | 临时本地 Coordinator 的邀请加入、空工作空间、一次性配对命令、PowerShell/POSIX 切换通过；该次临时测试服务已关闭 |
+| `pnpm test` | **104 tests across 16 files passed**, covering SQLite recovery, real WebSocket protocol, run isolation, acceptance gates, revision limits, simulated recovery, Git publication/recovery, drafts, and export |
+| `pnpm typecheck` | Shared package, Coordinator, and Runner passed |
+| `pnpm lint` | Passed |
+| `pnpm build` | Coordinator server/web and Runner production builds passed |
+| `pnpm build:pages` | Static demo build under `/team-agent/` passed |
+| `pnpm demo:smoke` | Passed using real invitations, sessions, pairing, WebSocket, SQLite, and local Git commit/push; Runner behavior was mocked and no model was called |
+| Project `pnpm run doctor` | Signed-in Codex, app-server handshake, Git, and directory checks passed; this is not proof of model generation |
+| Browser checks | Two-round simulation, review history, draft reload, long feedback preservation and disabled over-limit submission, actual Markdown download, desktop and 390px layout |
+| Real backend UI | Temporary Coordinator invitation, empty workspace, one-time pairing command, and PowerShell/POSIX selection worked; that temporary test server was stopped |
 
-Git 回归实际使用独立临时仓库和本地 bare remote，包含“审查后文件变化”和“commit hook 换入未经审查代码”的拒绝场景。配对命令测试在本机实际启动 PowerShell 7，检查引号、美元符号、命令替换、反引号、换行与中文参数保持原样。
+The narrow layout had no page or detail-dialog horizontal overflow; the detail tabs intentionally scroll within their own strip. These browser checks were performed on the original rebuild before the English copy update.
 
-构建有来自 Zod 依赖注释的 Rollup 提示，构建成功。CI 已配置 Ubuntu/Windows 与 Node 22/24 矩阵；上表记录本机检查，不能据此推断跨平台全部通过。矩阵执行结果以 [GitHub Actions CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml) 中对应提交的记录为准。
+Git regressions used isolated temporary repositories and local bare remotes, including rejection of changes made after review and commit-hook replacement of reviewed code. Pairing-command tests executed PowerShell 7 and checked that quotes, dollar signs, command substitution, backticks, line breaks, and Unicode arguments survived as literal data. Rollup emitted dependency-annotation notices from Zod, but the builds succeeded.
 
-## 真实 Codex 尝试：实现成功，完整验收未通过
+## Real Codex attempt: implementation passed, full acceptance did not
 
-另做了一次隔离的真实模型小目标验证，使用 Runner 的目标执行模块、真实 Codex app-server 与本地 Git。测试仓库不是本项目，也没有连接 GitHub。
+A separate isolated smoke attempt used the Runner goal-execution module, a real Codex app-server, and local Git. Its tiny test repository was not Team Agent and was not connected to GitHub.
 
-- 真实模型把 `math.cjs` 修为 `exports.sum = (a, b) => a + b;`。
-- Runner 实际运行 Node 测试，输出 `3 sum assertions passed`；测试文件的 Git blob 保持不变。
-- 实现与审查使用不同的真实线程；只读审查已经开始读取 Git 证据。
-- 模型响应多次 WebSocket 超时并回退。审查未在脚本设置的 260 秒截止前返回验收 JSON，脚本随后关闭 app-server。
-- 工作流最终为 **blocked**，没有发布；本地 HEAD 仍是 baseline，bare remote 只有原 `main` 分支。
+- The model changed `math.cjs` to `exports.sum = (a, b) => a + b;`.
+- The Runner executed Node assertions and recorded `3 sum assertions passed`; the test file's Git blob was unchanged.
+- Implementation and review used different real thread IDs. The read-only reviewer began inspecting Git evidence.
+- Model communication repeatedly timed out over WebSocket and fell back. The review did not return acceptance JSON before the script's 260-second deadline, after which the script closed app-server.
+- The workflow ended **blocked, without publication**. Local HEAD remained the baseline and the bare remote contained only its original `main` branch.
 
-[机器可读的实测记录](validation/real-codex-smoke.json)保存了实现、测试输出、线程身份、Git 状态和未发布结论。这不是完整真实端到端成功的证明；本版仍需在模型连接稳定的环境中完成真实目标的全部验收与发布。
+The [machine-readable evidence](validation/real-codex-smoke.json) preserves the implementation, test output, thread identities, Git state, and no-publication result. **A complete real-model acceptance-and-push cycle has not yet been demonstrated.** It still needs a successful run in an environment with stable model connectivity.
 
-此次运行还发现临时审查线程与本机协作工具识别可能不兼容。最后将新只读线程设为可持久记录（`ephemeral: false`），仍保持新上下文、只读和禁写审批。该最小调整已通过协议测试，没有再发起一轮真实模型全程复验。
+This attempt also exposed a possible compatibility issue between ephemeral review threads and local collaboration tooling. The final review-thread setting became `ephemeral: false`, while retaining a fresh context, read-only sandbox, and no write approvals. Protocol tests cover that adjustment; the full real-model smoke was not rerun afterward.
 
-## 研究依据与交付边界
+## Source material and limits
 
-已定位并核实 Claude 官方视频 [How the Claude Code team uses Claude Code](https://www.youtube.com/watch?v=S-sYlFiGFv8)，2026-09-02 发布，22:23；阅读了完整公开英文字幕，并补充官方文章与文档。目标与上下文、独立验证、有界反馈循环等设计推导见[带时间定位的中文研究笔记](claude-team-research.md)。
+The research used the official Claude video [How the Claude Code team uses Claude Code](https://www.youtube.com/watch?v=S-sYlFiGFv8), published September 2, 2026, with a duration of 22:23, and its publicly available English captions. The [research notes](claude-team-research.md) distinguish chapter summaries, supplementary official sources, and this project's design choices. No video copy or full transcript is distributed in this repository.
 
-没有交付视频副本或完整逐字稿。研究笔记清楚区分原视频观点、官方补充资料和本项目设计。当前执行后端仍为 Codex。
+The execution backend remains Codex. This work does not implement cloud-hosted Runners, execution while the owner's machine is asleep, Slack organization identities, scheduled routines, or parallel writable worktrees. Actual use depends on an available Runner, working Codex access, a runnable project test command, and the owner's Git permissions.
 
-本轮没有实现云托管 Runner、关机后持续执行、Slack 组织身份、定时 routines 或多个可写工作树并行实施。真实使用依赖 Runner 所在设备在线、Codex 模型连接及项目 Git 权限可用。
+[Set up real execution](getting-started.md) · [Workbench guide](workbench.md) · [Repository overview](../README.md)

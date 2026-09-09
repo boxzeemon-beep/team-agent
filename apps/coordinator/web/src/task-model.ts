@@ -80,7 +80,7 @@ export function parseDiff(diff: string): DiffFile[] {
       // precede the first Git header without inflating the evidence counts.
       if (hasGitHeaders) continue;
       if (!content.trim()) continue;
-      current = { path: "变更记录", lines: [], additions: 0, deletions: 0 };
+      current = { path: "Changes", lines: [], additions: 0, deletions: 0 };
       files.push(current);
     }
     const hunk = content.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -127,20 +127,22 @@ export function evidenceReport(task: Task, simulated: boolean) {
   };
   return [
     `# ${task.prompt}`,
-    simulated ? "> 模拟演示记录：没有调用 Codex，也没有执行 Git 或测试。" : "",
-    `状态：${task.status}`,
-    `任务 ID：${task.id}`,
-    `运行 ID：${task.runId || "旧版记录未提供"}`,
-    `发起人：${task.requesterName}`,
-    `Agent：${task.selectedAgentName}（${task.selectedAgentOwnerName}）`,
-    `创建时间：${task.createdAt}`,
-    `更新时间：${task.updatedAt}`,
+    simulated
+      ? "> Simulated demo record: no Codex calls, Git operations, or tests were executed."
+      : "",
+    `Status: ${task.status}`,
+    `Task ID: ${task.id}`,
+    `Run ID: ${task.runId || "Not recorded in this older task"}`,
+    `Requested by: ${task.requesterName}`,
+    `Agent: ${task.selectedAgentName} (${task.selectedAgentOwnerName})`,
+    `Created: ${task.createdAt}`,
+    `Updated: ${task.updatedAt}`,
     ...(task.brief
       ? [
-          "\n## 目标契约\n",
-          `执行方式：${task.brief.mode === "verified" ? "实现并独立验收" : "直接执行"}`,
-          `最多实现与验收轮数：${task.brief.maxIterations}`,
-          `背景：${task.brief.context || "未补充"}`,
+          "\n## Goal brief\n",
+          `Execution mode: ${task.brief.mode === "verified" ? "Verified goal" : "Direct task"}`,
+          `Maximum implementation and review rounds: ${task.brief.maxIterations}`,
+          `Context: ${task.brief.context || "Not provided"}`,
           ...task.brief.acceptanceCriteria.map(
             (criterion, index) => `${index + 1}. ${criterion}`,
           ),
@@ -148,35 +150,35 @@ export function evidenceReport(task: Task, simulated: boolean) {
       : []),
     ...(task.workflow
       ? [
-          "\n## 验收记录\n",
-          `阶段：${task.workflow.phase}；第 ${task.workflow.iteration} 轮；测试：${task.workflow.testStatus}`,
-          `检查点序号：${task.workflow.sequence}`,
-          "独立审查使用新只读 Codex 会话；演示记录除外。没有记录的标准不能认定通过。",
+          "\n## Acceptance record\n",
+          `Phase: ${task.workflow.phase}; round ${task.workflow.iteration}; tests: ${task.workflow.testStatus}`,
+          `Checkpoint sequence: ${task.workflow.sequence}`,
+          "Reviews use a fresh read-only Codex session, except in simulations. Criteria without evidence cannot be counted as passed.",
           ...task.workflow.reviews.flatMap((review) => [
-            `\n### 第 ${review.iteration} 轮：${review.verdict}\n`,
+            `\n### Round ${review.iteration}: ${review.verdict}\n`,
             review.summary,
-            `被审查代码树：${review.reviewedTreeSha || "未记录"}`,
+            `Reviewed Git tree: ${review.reviewedTreeSha || "Not recorded"}`,
             ...review.checks.map(
               (check) =>
-                `- [${check.status === "pass" ? "x" : " "}] ${check.criterion}（${check.status}）\n  证据：${check.evidence}`,
+                `- [${check.status === "pass" ? "x" : " "}] ${check.criterion} (${check.status})\n  Evidence: ${check.evidence}`,
             ),
-            ...review.issues.map((issue) => `- 问题：${issue}`),
+            ...review.issues.map((issue) => `- Issue: ${issue}`),
           ]),
         ]
       : []),
-    "\n## 结果\n",
-    task.result || "尚无结果",
-    "\n## 需要处理\n",
-    task.error || "无",
-    "\n## 代码差异\n",
-    task.diff ? codeBlock(task.diff, "diff") : "无",
-    "\n## 测试原始输出\n",
+    "\n## Result\n",
+    task.result || "No result yet",
+    "\n## Needs attention\n",
+    task.error || "None",
+    "\n## Code changes\n",
+    task.diff ? codeBlock(task.diff, "diff") : "None",
+    "\n## Raw test output\n",
     task.testOutput
       ? codeBlock(task.testOutput)
-      : "没有测试输出，无法据此认定测试通过。",
-    "\n## 提交\n",
-    task.commitSha || "无",
-    "\n## 协作记录\n",
+      : "No test output was recorded. Test success cannot be inferred.",
+    "\n## Commit\n",
+    task.commitSha || "None",
+    "\n## Activity\n",
     ...task.messages.map(
       (message) =>
         `${message.createdAt} · ${message.memberName}\n${message.content}\n`,

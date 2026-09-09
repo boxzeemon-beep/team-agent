@@ -1,128 +1,106 @@
-# 从 Claude Code 团队实践到 Team Agent 的验收闭环
+# From the Claude Code team's practices to Team Agent
 
-**状态：核心流程已实装，验证范围见[交付记录](delivery.md)。** 本文保留原始资料、产品推导与设计约定；每项能力是否经过模拟、真实本地 Git 或真实 Codex 验证，以交付记录为准。
+[Product overview](../README.md) · [Workbench guide](workbench.md) · [Validation record](delivery.md)
 
-本轮要解决的问题是：用户交出一个目标后，如何看到它是否满足约定，而不必从大量执行日志中自行推断。设计保留 Team Agent 的本地 Runner、显式 Agent 选择和项目串行执行，并增加可以检查、可以修订、可以追溯的验收过程。
+These notes connect source material to Team Agent's design. They distinguish what the sources describe from what this project implements. The execution backend is still Codex; this is not a Claude integration or a reproduction of Anthropic's internal systems. Actual verification coverage belongs in the [validation record](delivery.md).
 
-## 原始视频与阅读边界
+## Original video
 
-| 项目 | 已核实信息 |
+| Field | Recorded information |
 | --- | --- |
-| 视频 | [How the Claude Code team uses Claude Code](https://www.youtube.com/watch?v=S-sYlFiGFv8) |
-| 原始发布者 | Claude 官方频道 |
-| 发布日期 | 2026 年 9 月 2 日 |
-| 时长 | 1,343 秒，即 22:23 |
-| 参与者 | Thariq Shihipar、Sid Bidasaria、Robert Boyce |
-| 核实方式 | 本任务读取 YouTube 元信息及公开英文字幕 |
-| 许可字段 | 元信息返回 `license: null`；不能据此认定存在开放转载许可 |
+| Video | [How the Claude Code team uses Claude Code](https://www.youtube.com/watch?v=S-sYlFiGFv8) |
+| Publisher | Official Claude channel |
+| Published | September 2, 2026 |
+| Duration | 1,343 seconds / 22:23 |
+| Participants | Thariq Shihipar, Sid Bidasaria, Robert Boyce |
+| Research method | YouTube metadata and publicly available English captions |
 
-本任务没有下载整段视频，也没有保存或交付完整逐字稿。下面是精简的章节研究笔记；后面的实现约定是本项目的设计推导，不是视频逐字转写，也不是对 Anthropic 内部系统的复刻说明。
+The research did not download the full video or save/distribute a complete transcript. The metadata's empty license field did not establish permission to redistribute it. The chapter notes below are short paraphrases; the later implementation contract is this project's own design.
 
-### 精简章节笔记
+## Chapter notes
 
-| 原始章节 | 内容转述 |
+| Chapter | Main theme |
 | --- | --- |
-| [0:00 开场](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=0s) | 回顾使用方式随模型能力变化。 |
-| [0:35 从工具调用到目标](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=35s) | 在共享上下文中交付目标；约 1:23 的 70–80% 是一位成员对自己工作量的估计，不是全组织统计。 |
-| [2:17 跟随技术演进](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=137s) | 模型进步后，重新判断哪些辅助机制仍有必要。 |
-| [4:48 问题、产物与 Claude Tag](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=288s) | 用可视化产物交流方案是成员的使用体验，不是通用替代规则。 |
-| [6:41 远程循环与例行工作](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=401s) | 远程执行减少对笔记本持续开机的依赖。 |
-| [8:52 动态工作流](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=532s) | 并行调查、独立质疑和汇总，把人类审查留给整体判断。 |
-| [14:04 验证与反馈](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=844s) | 将运行验证、审查和用户反馈接成循环。 |
-| [18:37 过去的开发体验](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=1117s) | 讨论自主执行改变了什么，以及仍怀念的开发体验。 |
+| [0:00 Introduction](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=0s) | How working practices have changed as models improve. |
+| [0:35 From tool calls to goals](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=35s) | Delegating outcomes with shared context. The 70–80% estimate near 1:23 is one participant's estimate of their own workload, not an organization-wide statistic. |
+| [2:17 Adapting to progress](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=137s) | Reconsidering supporting mechanisms when model capabilities change. |
+| [4:48 Questions, artifacts, and Claude Tag](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=288s) | Visual artifacts as a way to discuss work; a participant's experience, not a universal rule. |
+| [6:41 Remote loops and routines](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=401s) | Remote execution reduces dependence on an always-awake laptop. |
+| [8:52 Dynamic workflows](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=532s) | Parallel investigation, independent challenge, and synthesis leave humans more room for overall judgment. |
+| [14:04 Verification and feedback](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=844s) | Connecting checks, review, and user feedback into an improvement loop. |
+| [18:37 Earlier development experiences](https://www.youtube.com/watch?v=S-sYlFiGFv8&t=1117s) | What autonomous execution changes and which earlier experiences participants miss. |
 
-## 一手文字资料如何支撑设计
+## Supplementary primary sources
 
-以下文章与文档各自说明了相关做法。它们补充视频中的主题，不是这段视频的官方逐字稿；成员经验也不等于所有团队都应采用的固定流程。
+These sources support related practices. They are not transcripts of the video, and individual experiences do not establish a required process for every team.
 
-| 来源 | 可以据此确认的内容 | 对 Team Agent 的设计启发 |
+| Source | Relevant observation | Team Agent design choice |
 | --- | --- | --- |
-| [How Anthropic employees use Claude Tag](https://claude.com/blog/how-anthropic-employees-use-claude-tag)，2026-08-28 | 员工在共享线程中交付工作，Agent 使用线程上下文并把结果交回原处。 | 新目标应携带问题背景、来源任务与后续反馈；不能只保存一句孤立指令。 |
-| [Using Claude Code: The unreasonable effectiveness of HTML](https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html)，Thariq Shihipar，2026-05-20 | 作者使用 HTML 呈现规格、探索与交互式选择，使协作对象更容易理解和回应。文章明确表达个人使用偏好。 | 把验收状态、证据和下一步做成可读的界面；本轮不因此引入任意 HTML 执行能力。 |
-| [A harness for every task: dynamic workflows in Claude Code](https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code)，Thariq Shihipar、Sid Bidasaria，2026-06-02 | 独立上下文、对抗验证、明确停止条件和可恢复编排能改善复杂工作。并行与模型调用也有额外成本。 | 首先做有界的执行与独立审查循环，不把固定数量的多 Agent 阶段强加给所有任务。 |
-| [Building verification loops in Claude Code with skills](https://claude.com/blog/building-verification-loops-in-claude-code-with-skills)，Delba de Oliveira，2026-07-22 | 把人工反复检查的步骤写成可复用验证流程；运行、观察、修复形成闭环，团队还可以组合不同检查。 | 验收必须指向实际检查与证据。执行 Agent 的自述和审查 Agent 的意见，都不能替代实际测试。 |
-| [Automate work with routines](https://code.claude.com/docs/en/routines) 与 [Desktop scheduled tasks](https://code.claude.com/docs/en/desktop-scheduled-tasks) | 远程 routine 与本地计划任务具有不同执行环境；本地任务依赖电脑及应用运行。 | 界面必须说明本地 Runner 是否可用，不能承诺关机后继续执行。远程例行工作留待后续设计。 |
-| [What is Claude Tag?](https://support.claude.com/en/articles/15594475-what-is-claude-tag) | 频道内组织身份、频道权限和个人私聊身份有明确区别。 | Team Agent 当前借用所有者的本机权限；不能把它描述为已具备 Slack 组织身份和频道权限模型。 |
+| [How Anthropic employees use Claude Tag](https://claude.com/blog/how-anthropic-employees-use-claude-tag), August 28, 2026 | Work can be delegated within a shared thread whose context accompanies the request. | Preserve context, source tasks, and follow-up feedback with each goal. |
+| [Using Claude Code: The unreasonable effectiveness of HTML](https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html), Thariq Shihipar, May 20, 2026 | The author uses HTML for specifications, exploration, and interactive choices as a personal working preference. | Make criteria, evidence, and next actions readable in the workbench; do not add arbitrary HTML execution. |
+| [A harness for every task: dynamic workflows in Claude Code](https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code), Thariq Shihipar and Sid Bidasaria, June 2, 2026 | Independent contexts, adversarial checks, stopping conditions, and recovery can help complex work; parallelism adds cost. | Start with a bounded implementation/review loop rather than imposing many Agent stages on every request. |
+| [Building verification loops in Claude Code with skills](https://claude.com/blog/building-verification-loops-in-claude-code-with-skills), Delba de Oliveira, July 22, 2026 | Repeated manual checks can become reusable run/observe/fix workflows. | Require actual project test evidence alongside model review. |
+| [Automate work with routines](https://code.claude.com/docs/en/routines) and [Desktop scheduled tasks](https://code.claude.com/docs/en/desktop-scheduled-tasks) | Remote and local scheduled work have different execution environments; local tasks depend on the computer and app running. | Show Runner availability and document that local work stops depending on the host's availability; defer hosted routines. |
+| [What is Claude Tag?](https://support.claude.com/en/articles/15594475-what-is-claude-tag) | Organization/channel identity and personal direct-message identity have distinct permissions. | Describe Team Agent's actual owner-local permissions instead of claiming Slack organization identity or channel authorization. |
 
-## 本仓库的设计约定
+## The implementation contract
 
-### 从任务输入到可检查的目标
+### A goal is an agreement
 
-每项任务的 brief 包含四类信息：
+A brief contains the requested outcome and context, stable acceptance criteria, the execution mode, and a round limit. Criteria are matched by their normalized text and must not disappear just because implementation failed a check. A verified goal supports one to three rounds; reconnecting must not create an unbounded revision budget.
 
-- **目标与背景**：要改善的行为、为什么要做、相关约束与已有上下文。
-- **验收条目**：用户能逐项判断的完成条件。本版以去重后的条目原文作为匹配依据，跨轮次保持一致，不能由执行者在失败后悄悄删去。
-- **执行方式**：`direct` 或 `verified`。界面用清楚的中文解释区别，内部字段名不应要求用户理解。
-- **轮次上限**：`verified` 允许 1–3 轮；上限约束整个修订与验收过程，不能在恢复任务时重新获得无限次机会。
+Direct tasks retain the existing implementation, configured-test, and result workflow. Verified goals add per-criterion acceptance before commit/push. The UI explains both modes in English and keeps them identifiable when reading results.
 
-`direct` 用于范围明确、用户希望直接执行的任务：保留原有执行、配置测试与结果记录，不声称经历了独立验收。`verified` 用于需要验收后交付的目标：必须逐项审查，通过门槛后才允许发布。两种方式在任务创建与结果页都应可辨认。
-
-### 验收执行顺序
+### Evidence comes before publication
 
 ```text
-目标 brief
-  → 本地 Agent 实施
-  → 运行实际测试并保存结果
-  → 新建只读 Codex 会话，独立逐项审查
-  → 全部满足：发布并记录提交
-  → 未满足且未到上限：修订 → 重测 → 再次独立审查
-  → 到达上限或无法继续：待处理，保留证据
+Goal and context
+  → Local Agent implementation
+  → Actual project tests and saved output
+  → Fresh read-only Codex review of each criterion
+  → All requirements satisfied: commit and push the reviewed state
+  → Fixable issues with rounds remaining: revise, retest, rereview
+  → Limit reached or cannot verify: needs attention, evidence preserved
 ```
 
-上图描述 `verified` 方式已经落入代码的执行契约。独立会话、测试门槛、恢复与发布对应不同层次的验证；实际覆盖与未通过的外部运行检查见交付记录。
+The reviewer receives the agreement, current changes, and actual test record in a fresh Codex context. It does not inherit the implementation thread's reasoning history, modify files, commit, or push. Fresh context supports an independent check but does not guarantee that the second opinion is correct.
 
-审查者接收目标、验收条目、当前代码差异和真实检查记录，使用新的只读 Codex thread。它不沿用实施者的推理历史，不修改文件，不创建提交，不推送代码。新的上下文有助于独立判断，但不意味着第二个模型天然正确。
+Each criterion receives `pass`, `fail`, or `unknown`, with concrete evidence. Unknown is not success. Failed tests, missing evidence, malformed JSON, missing/duplicate criteria, or unresolved review issues cannot cross the publication gate. The presence of a test log and a natural-language completion claim are insufficient.
 
-每个验收条目返回以下三种结果之一，并附具体依据：
+Publication means the existing Git commit/push workflow to the configured shared branch. It does not mean deployment, protected-branch merge, or external approval. The tested and reviewed Git tree must remain the tree being published.
 
-| 结果 | 含义 | 后续处理 |
-| --- | --- | --- |
-| `pass` | 当前证据支持该条已满足 | 纳入本轮通过判断 |
-| `fail` | 已发现与条目冲突的行为或结果 | 在剩余轮次内修订并重新检查 |
-| `unknown` | 证据缺失，或当前环境无法可靠判断 | 不视为通过；补充检查或交回用户处理 |
+### Run identity and recovery are durable
 
-自动通过必须建立在真实检查与完整、有效的逐项审查结果上。测试失败、缺少必要证据、审查响应无法解析、缺失验收条目或出现 `unknown` 都不能被转换成成功。展示“存在测试输出”不等于测试通过，也不能从自然语言中的“完成”二字推断可发布。
+The current phase, round, limit, checks, and run identity are persisted facts. The real UI follows Runner/Coordinator records rather than estimating execution with browser timers. Late messages from an older `runId` cannot overwrite newer progress or release the current execution lock.
 
-本轮“发布”特指 Runner 对项目配置的共享分支完成既有提交与推送流程；不表示部署服务、合并受保护分支或自动获得外部审批。`verified` 的发布门槛必须先于这一动作。
+Reconnection restores the existing assignment and checkpoints. Retry preserves the agreed goal and limit while starting a new run and archiving earlier evidence. New feedback creates a new editable agreement, without rewriting the original outcome or inheriting its passing verdict.
 
-### 阶段与运行身份是持久化事实
+The project-wide lock still serializes code writes. Adding a read-only review session does not implement parallel writable worktrees.
 
-任务需要保存当前阶段、当前轮次、轮次上限、检查结果和当前运行身份。界面显示实施、测试、审查、修订、发布、待处理等阶段，依据 Runner 与 Coordinator 的记录，不用浏览器计时器推断真实执行进度。
+### The interface should answer acceptance questions
 
-每次实际运行使用 `runId` 区分；旧运行迟到的进度、审查结果或完成消息，不能覆盖当前运行，也不能释放当前执行锁。重连与重启恢复应读取已保存的阶段和轮次，避免重复发布、重复开启预算或把旧证据用于新一轮通过判断。
+Task details should make it easy to understand the goal, satisfied criteria, supporting evidence, and the next person/action needed. Detailed logs remain available for diagnosis. Waiting for owner approval, an offline Agent, failed tests, missing evidence, and a round limit are distinct situations with different recovery actions.
 
-项目串行锁继续覆盖代码写入过程。增加一个只读审查会话，不等于已经实现多个可写工作树的并行调度。
+Saving a comment is not permission to start another task. The follow-up action prepares a draft that the user reviews and explicitly submits. Simulated examples remain marked as simulated, including exports.
 
-### 界面优先回答验收问题
+## Deliberately outside this implementation
 
-任务详情首先回答四件事：目标是什么、哪些验收条目满足了、依据是什么、下一步由谁处理。展示当前阶段与轮次，条目支持查看测试结果、代码差异或审查依据；完整执行日志保留在次级入口，供排查和追溯。
+- Slack integration, shared-channel memory, organization Agent identities, and channel permissions.
+- Hosted Runners, execution while the owner's machine is asleep, remote routines, and scheduled triggers.
+- Multi-project routing, concurrent writable worktrees, or large-scale dynamic Agent orchestration.
+- A trusted environment for arbitrary HTML artifacts or a substitute for every human decision.
+- Automatic deployment, protected-branch merges, or treating model review as a correctness guarantee.
 
-当任务需要人处理时，要区分等待所有者本机审批、Agent 离线、真实测试失败、验收不满足、证据不足和达到轮次上限。它们对应的恢复动作不同，不能合并成一个不解释原因的“失败”。
+## Verification requirements
 
-用户在结果后补充反馈时，可以明确创建一个携带来源任务、原目标和反馈内容的新目标。原任务的交付与审查证据保持原样；新目标进入正常排队与验收过程，不继承此前的通过结论。保存一句讨论不应被悄悄解释为立即重跑或发布授权。
+These are design acceptance requirements, not assertions that every external integration passed:
 
-## 本轮明确不实现的范围
+1. Validate and persist the goal, criteria, mode, and round limit; preserve older direct tasks.
+2. Start a genuinely fresh read-only review context and require valid per-criterion results.
+3. Block publication on failed tests, failed/unknown criteria, or invalid review data.
+4. Run tests and fresh review again after revisions; stop at the agreed limit.
+5. Reject stale run messages and preserve correct locking through reconnects, duplicates, and restarts.
+6. Present criteria, phases, rounds, evidence, and follow-up context without rewriting history.
+7. Distinguish mock, real local Git, and real Codex checks in both the UI and validation record.
 
-- Slack 集成、共享频道记忆、组织 Agent 身份及频道权限模型。
-- 云托管 Runner、关闭所有者电脑后继续执行、远程 routines 或自动定时触发。
-- 多项目自动路由、多个可写工作树并行实施，以及上百 Agent 的动态编排。
-- 任意 HTML 产物的可信执行环境、自动替代所有人工决策的可视化审批系统。
-- 自动部署、自动合并受保护分支，或将模型审查当作安全和正确性的保证。
-
-这些能力不能用模拟动画、按钮或文档措辞代替实际实现。浏览器演示可解释新流程，但必须持续标记模拟数据；其测试、审查和提交显示不构成真实执行证据。
-
-## 交付前应验证什么
-
-下列条目是验收要求，不是已通过的测试声明：
-
-1. brief 的目标、条目、方式与轮次上限经过输入校验并可持久恢复；旧任务仍能阅读和执行其原有流程。
-2. `verified` 确实启动独立只读会话，返回可解析的逐项结果；不接受遗漏条目或无法识别的结果作为通过。
-3. 真实测试失败、审查 `fail`、审查 `unknown` 和审查解析错误均不能越过发布门槛。
-4. 修订后重新运行测试与独立审查；达到上限后进入待处理，不无限循环。
-5. 旧 `runId` 的进度、完成和审查消息无效；重连、重复消息与重启恢复不会错误发布或释放执行位。
-6. 界面能清楚展示阶段、轮次、验收结论与证据；反馈创建的新目标保留来源，同时不改写旧结果。
-7. 真实模式与模拟模式的证据标记正确；测试记录说明哪些使用了 mock、真实本地 Git 或真实 Codex，不能互相替代。
-
-实测结果集中写在[交付记录](delivery.md)，其中注明失败、未验证项与环境边界；设计约定不代替运行证据。
-
-[工作台预览说明](workbench.md) · [中文 README](../README.zh-CN.md)
+Read the [observed results](delivery.md) for successful checks, failures, and environment limits. A design contract cannot replace execution evidence.

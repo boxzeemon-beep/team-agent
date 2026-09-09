@@ -22,17 +22,22 @@ export function advanceSimulatedGoal(
         iteration: workflow.iteration,
         verdict: passed ? "pass" : exhausted ? "blocked" : "revise",
         summary: passed
-          ? "【模拟复审】修订后通过固定场景；未验证真实需求。"
-          : "【模拟审查】固定场景发现键盘焦点缺失，需要修订。",
+          ? "[SIMULATED REVIEW] The revised fixed example passes; your actual request has not been verified."
+          : "[SIMULATED REVIEW] The fixed example fails one acceptance check and needs revision.",
         checks: brief.acceptanceCriteria.map((criterion, index) => ({
           criterion,
           status:
             passed || index < brief.acceptanceCriteria.length - 1
               ? "pass"
               : "fail",
-          evidence: "【模拟证据】仅演示逐项验收界面；没有执行你的需求或测试。",
+          evidence:
+            "[SIMULATED EVIDENCE] An example of a criterion-level review; your request and tests were not executed.",
         })),
-        issues: passed ? [] : ["【模拟问题】任务卡片缺少可见的键盘焦点。"],
+        issues: passed
+          ? []
+          : [
+              "[SIMULATED ISSUE] One agreed criterion is not yet satisfied in the fixed example.",
+            ],
         ...(passed ? { reviewedTreeSha: "0".repeat(40) } : {}),
       });
       workflow.phase = passed

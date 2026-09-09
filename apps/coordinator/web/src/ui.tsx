@@ -72,20 +72,28 @@ export const taskStates: Record<
   TaskStatus,
   { label: string; tone: string; icon: IconName }
 > = {
-  queued: { label: "排队中", tone: "neutral", icon: "clock" },
-  waiting_for_agent: { label: "等待 Agent", tone: "amber", icon: "clock" },
-  running: { label: "执行中", tone: "blue", icon: "activity" },
-  waiting_for_owner: { label: "等待所有者", tone: "amber", icon: "shield" },
-  completed: { label: "已完成", tone: "green", icon: "check" },
-  needs_attention: { label: "待处理", tone: "red", icon: "alert" },
-  canceled: { label: "已取消", tone: "neutral", icon: "close" },
+  queued: { label: "Queued", tone: "neutral", icon: "clock" },
+  waiting_for_agent: {
+    label: "Waiting for Agent",
+    tone: "amber",
+    icon: "clock",
+  },
+  running: { label: "Running", tone: "blue", icon: "activity" },
+  waiting_for_owner: {
+    label: "Waiting for owner",
+    tone: "amber",
+    icon: "shield",
+  },
+  completed: { label: "Completed", tone: "green", icon: "check" },
+  needs_attention: { label: "Needs attention", tone: "red", icon: "alert" },
+  canceled: { label: "Canceled", tone: "neutral", icon: "close" },
 };
 export const agentStates: Record<AgentStatus, { label: string; tone: string }> =
   {
-    online: { label: "在线 · 可接任务", tone: "green" },
-    busy: { label: "忙碌 · 可排队", tone: "blue" },
-    offline: { label: "离线", tone: "neutral" },
-    paused: { label: "已暂停共享", tone: "amber" },
+    online: { label: "Online · Available", tone: "green" },
+    busy: { label: "Busy · Queue available", tone: "blue" },
+    offline: { label: "Offline", tone: "neutral" },
+    paused: { label: "Sharing paused", tone: "amber" },
   };
 export function TaskBadge({ status }: { status: TaskStatus }) {
   const state = taskStates[status];
@@ -116,11 +124,11 @@ export function Avatar({
   );
 }
 export function timeLabel(value: string | null, full = false) {
-  if (!value) return "尚未连接";
+  if (!value) return "Not connected yet";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "未知时间";
+  if (Number.isNaN(date.getTime())) return "Unknown time";
   return new Intl.DateTimeFormat(
-    "zh-CN",
+    "en",
     full
       ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
       : { hour: "2-digit", minute: "2-digit" },
@@ -166,7 +174,7 @@ export function Modal({
           type="button"
           className="icon-button"
           onClick={onClose}
-          aria-label="关闭弹窗"
+          aria-label="Close dialog"
         >
           <Icon name="close" />
         </button>
@@ -177,7 +185,7 @@ export function Modal({
 }
 export function CopyButton({
   value,
-  label = "复制",
+  label = "Copy",
 }: {
   value: string;
   label?: string;
@@ -196,13 +204,13 @@ export function CopyButton({
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
-          setState("已复制");
+          setState("Copied");
         } catch {
-          setState("复制失败，请手动选择");
+          setState("Copy failed. Select and copy manually.");
         }
       }}
     >
-      <Icon name={state === "已复制" ? "check" : "copy"} size={14} />
+      <Icon name={state === "Copied" ? "check" : "copy"} size={14} />
       <span role="status">{state || label}</span>
     </button>
   );

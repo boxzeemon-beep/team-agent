@@ -68,7 +68,7 @@ export const goalBriefSchema = z
       context.addIssue({
         code: "custom",
         path: ["acceptanceCriteria"],
-        message: "验收目标至少需要一条验收标准。",
+        message: "A verified goal requires at least one acceptance criterion.",
       });
     if (
       new Set(brief.acceptanceCriteria).size !== brief.acceptanceCriteria.length
@@ -76,7 +76,7 @@ export const goalBriefSchema = z
       context.addIssue({
         code: "custom",
         path: ["acceptanceCriteria"],
-        message: "验收标准不能重复。",
+        message: "Acceptance criteria must be unique.",
       });
   });
 
@@ -115,7 +115,7 @@ export const goalWorkflowSchema = z
     reviews: z.array(goalReviewSchema).max(3),
   })
   .refine((workflow) => workflow.iteration <= workflow.maxIterations, {
-    message: "工作轮次不能超过约定上限。",
+    message: "The current round cannot exceed the agreed limit.",
   });
 
 export type GoalBrief = z.infer<typeof goalBriefSchema>;

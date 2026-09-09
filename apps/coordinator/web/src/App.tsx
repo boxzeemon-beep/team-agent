@@ -46,39 +46,39 @@ import {
 
 type View = "overview" | "tasks" | "agents" | "activity";
 const navigation: { id: View; label: string; icon: IconName }[] = [
-  { id: "overview", label: "工作台", icon: "grid" },
-  { id: "tasks", label: "全部任务", icon: "tasks" },
-  { id: "agents", label: "团队 Agent", icon: "agents" },
-  { id: "activity", label: "协作动态", icon: "activity" },
+  { id: "overview", label: "Workbench", icon: "grid" },
+  { id: "tasks", label: "All tasks", icon: "tasks" },
+  { id: "agents", label: "Team Agents", icon: "agents" },
+  { id: "activity", label: "Activity", icon: "activity" },
 ];
 const templates = [
   {
-    label: "修复一个问题",
+    label: "Fix a bug",
     icon: "code",
-    text: "修复登录状态在页面刷新后丢失的问题。\n请先复现问题，补充回归测试，并说明修改范围和验证结果。",
+    text: "Fix the loss of login state after a page refresh.\nReproduce the issue, add regression tests, and describe the changes and verification results.",
     criteria:
-      "刷新页面后保留有效的登录状态\n退出登录后不能访问受保护页面\n自动化测试覆盖以上两种情况",
+      "A valid session survives a page refresh\nProtected pages cannot be accessed after signing out\nAutomated tests cover both behaviors",
   },
   {
-    label: "打磨使用体验",
+    label: "Improve the experience",
     icon: "spark",
-    text: "优化空状态的使用体验。\n提供清楚的下一步引导，确保键盘可操作，并检查移动端布局。",
+    text: "Improve the empty state.\nProvide a clear next action, support keyboard navigation, and check the mobile layout.",
     criteria:
-      "空任务列表显示可操作的下一步引导\n所有主要操作可通过键盘访问\n390px 宽度下没有横向溢出",
+      "An empty task list offers a clear next action\nAll primary actions are accessible by keyboard\nThere is no horizontal overflow at 390px",
   },
   {
-    label: "补齐关键测试",
+    label: "Add key tests",
     icon: "terminal",
-    text: "为 API 请求的超时与重试逻辑补充测试。\n覆盖正常响应、网络失败和重试耗尽的场景，说明测试运行结果。",
+    text: "Add tests for API timeouts and retries.\nCover successful responses, network failures, and exhausted retries, and report the test results.",
     criteria:
-      "测试覆盖正常响应与网络失败\n重试有明确上限，耗尽后返回可理解的错误\n新增测试和已有回归测试全部通过",
+      "Tests cover successful responses and network failures\nRetries have a fixed limit and return a clear error when exhausted\nNew tests and existing regression tests pass",
   },
 ] as const;
 const filters: { id: TaskFilter; label: string }[] = [
-  { id: "all", label: "全部" },
-  { id: "active", label: "进行中" },
-  { id: "attention", label: "待处理" },
-  { id: "completed", label: "已完成" },
+  { id: "all", label: "All" },
+  { id: "active", label: "Active" },
+  { id: "attention", label: "Needs attention" },
+  { id: "completed", label: "Completed" },
 ];
 
 function AgentTile({
@@ -106,7 +106,7 @@ function AgentTile({
       </span>
       <span className="agent-tile-text">
         <strong>{agent.displayName}</strong>
-        <small>{agent.ownerName} 的本地 Agent</small>
+        <small>{agent.ownerName}’s local Agent</small>
         <span
           className={`agent-availability tone-${agentStates[agent.status].tone}`}
         >
@@ -164,7 +164,7 @@ function Workspace({
   useEffect(() => {
     // Navigation starts at the page heading, including after scrolling a long
     // list on mobile. Choosing an Agent subsequently focuses the composer.
-    document.title = `${navigation.find((item) => item.id === view)?.label ?? "工作台"} · Team Agent`;
+    document.title = `${navigation.find((item) => item.id === view)?.label ?? "Workbench"} · Team Agent`;
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [view]);
   const [filter, setFilter] = useState<TaskFilter>("all");
@@ -200,7 +200,7 @@ function Workspace({
   }
   const briefProblem =
     prompt.length > 20000
-      ? "目标最多 20,000 字，完整草稿已保留，请删减后提交。"
+      ? "Goals are limited to 20,000 characters. Your full draft is saved; shorten it before submitting."
       : goalDraftError(goalDraft);
   useEffect(() => {
     try {
@@ -272,7 +272,9 @@ function Workspace({
       if (version !== refreshVersion.current) return;
       if (cause instanceof ApiError && cause.status === 401) onUnauthorized();
       else
-        setRefreshError("暂时无法同步最新数据。当前显示上一次快照，正在重连。");
+        setRefreshError(
+          "Cannot sync right now. Showing the last snapshot while reconnecting.",
+        );
     }
   }, [onUnauthorized]);
   useEffect(() => {
@@ -416,11 +418,15 @@ function Workspace({
       await refresh();
       setFilter("all");
       setQuery("");
-      setNotice("目标已交给 Agent，可在详情中查看进展与验收证据。");
+      setNotice(
+        "Goal sent to the Agent. Open its details to follow progress and review evidence.",
+      );
       openTask(task.id);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "提交失败，草稿已保留。",
+        cause instanceof Error
+          ? cause.message
+          : "Submission failed. Your draft has been kept.",
       );
     } finally {
       setBusy(false);
@@ -438,31 +444,35 @@ function Workspace({
       );
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "更新共享状态失败");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not update sharing status.",
+      );
     } finally {
       setBusy(false);
     }
   }
   const projectName = snapshot.settings.projectName.replace(/^\[DEMO\]\s*/, "");
   const launchHint = !selectedAgent
-    ? "请明确选择一位执行 Agent"
+    ? "Choose an Agent to run this goal."
     : selectedAgent.status === "offline"
-      ? "这位 Agent 离线，提交后将等待连接，也可改派。"
+      ? "This Agent is offline. The goal will wait for a connection, or you can reassign it."
       : selectedAgent.status === "busy" || running
-        ? "项目一次执行一个代码任务，本任务将按顺序排队。"
-        : "Agent 已就绪，提交后将开始执行。";
+        ? "Coding tasks run one at a time per project. This goal will join the queue."
+        : "The Agent is ready to start your goal.";
   const title =
     view === "overview"
-      ? "给团队一个目标。"
+      ? "Give your team a goal."
       : view === "tasks"
-        ? "每一步，都有迹可循。"
+        ? "Follow every step."
         : view === "agents"
-          ? "你的团队，不止于人。"
-          : "协作，在这里持续发生。";
+          ? "Meet your team’s Agents."
+          : "Keep the work in context.";
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
-        跳到主要内容
+        Skip to main content
       </a>
       <aside className="sidebar">
         <button
@@ -485,12 +495,12 @@ function Workspace({
           </span>
           <span>
             <strong>{projectName}</strong>
-            <small>{simulated ? "演示工作空间" : "团队工作空间"}</small>
+            <small>{simulated ? "Demo workspace" : "Team workspace"}</small>
           </span>
           <Icon name="down" size={14} />
         </button>
-        <div className="nav-label">工作空间</div>
-        <nav aria-label="主导航">
+        <div className="nav-label">Workspace</div>
+        <nav aria-label="Main navigation">
           {navigation.map((item) => (
             <button
               type="button"
@@ -512,27 +522,27 @@ function Workspace({
           <div className="sidebar-note">
             <span className="tiny-spark">✳</span>
             <strong>
-              一个人很快，
+              Your Agent.
               <br />
-              一起走得更远。
+              Your whole team.
             </strong>
             <p>
-              把你的 Agent 接入团队，
+              Connect your local Agent
               <br />
-              让好的协作自然发生。
+              and help your team build.
             </p>
             <button type="button" onClick={() => setModal("connect")}>
-              接入我的 Agent <Icon name="arrow" size={14} />
+              Connect Agent <Icon name="arrow" size={14} />
             </button>
           </div>
           <a
             className="nav-item"
-            href="https://github.com/boxzeemon-beep/team-agent"
+            href="https://github.com/boxzeemon-beep/team-agent/blob/main/docs/getting-started.md"
             target="_blank"
             rel="noreferrer"
           >
             <Icon name="book" size={17} />
-            <span>项目与使用指南</span>
+            <span>Setup and usage guide</span>
             <Icon name="up" size={14} />
           </a>
           <button
@@ -541,7 +551,7 @@ function Workspace({
             onClick={() => setModal("settings")}
           >
             <Icon name="settings" size={18} />
-            <span>项目设置</span>
+            <span>Project settings</span>
           </button>
           <div className="user-card">
             <Avatar name={snapshot.me.name} small />
@@ -549,13 +559,13 @@ function Workspace({
               <strong>{snapshot.me.name}</strong>
               <small>
                 {snapshot.me.isAdmin
-                  ? "项目管理员"
+                  ? "Administrator"
                   : simulated
-                    ? "欢迎来体验"
-                    : "团队成员"}
+                    ? "Demo visitor"
+                    : "Team member"}
               </small>
             </span>
-            <span className="version-label">v0.2</span>
+            <span className="version-label">Preview</span>
           </div>
         </div>
       </aside>
@@ -565,8 +575,8 @@ function Workspace({
             <button
               type="button"
               className="breadcrumb-project"
-              aria-label={`项目设置：${projectName}`}
-              title={`${projectName} · 项目设置`}
+              aria-label={`Project settings: ${projectName}`}
+              title={`${projectName} · Project settings`}
               onClick={() => setModal("settings")}
             >
               <Icon name="settings" size={15} />
@@ -584,10 +594,10 @@ function Workspace({
             >
               <i />
               {isStaticDemo
-                ? "本地演示"
+                ? "Browser demo"
                 : connected && !refreshError
-                  ? "实时同步"
-                  : "正在重连"}
+                  ? "Live"
+                  : "Reconnecting"}
             </span>
             <button
               type="button"
@@ -595,7 +605,7 @@ function Workspace({
               onClick={() => setModal("connect")}
             >
               <Icon name="plus" size={15} />
-              接入 Agent
+              Connect Agent
             </button>
           </div>
         </header>
@@ -604,13 +614,13 @@ function Workspace({
             <span className="demo-tag">DEMO</span>
             <p>
               {isStaticDemo
-                ? "自由体验，放心探索。所有 Agent、执行过程与交付证据均为模拟。"
-                : "演示模式：执行过程与交付证据为模拟，不调用 Codex 或 Git。"}
+                ? "Explore freely. All Agents, execution steps, and evidence are simulated."
+                : "Demo mode: execution and evidence are simulated. No Codex or Git operations run."}
             </p>
             {isStaticDemo && (
               <button type="button" onClick={() => setModal("reset")}>
                 <Icon name="refresh" size={13} />
-                重置演示
+                Reset demo
               </button>
             )}
           </div>
@@ -631,12 +641,12 @@ function Workspace({
                 <h1>{title}</h1>
                 <p>
                   {view === "overview"
-                    ? "带上背景与完成标准，让 Agent 推进实现、验证与交付。"
+                    ? "Add context and acceptance criteria. Let an Agent implement, verify, and deliver."
                     : view === "tasks"
-                      ? "从一句需求，到一份可审阅的交付。"
+                      ? "From a clear request to a result you can review."
                       : view === "agents"
-                        ? "借用队友的本地能力，凭据仍由所有者掌握。"
-                        : "需求、讨论与结果，汇成团队的共同上下文。"}
+                        ? "Use a teammate’s local Agent. Credentials stay with its owner."
+                        : "Requests, discussions, and results form your team’s shared context."}
                 </p>
               </div>
               {view !== "overview" && (
@@ -646,7 +656,7 @@ function Workspace({
                   onClick={focusComposer}
                 >
                   <Icon name="plus" size={16} />
-                  新任务
+                  New task
                 </button>
               )}
             </div>
@@ -658,7 +668,7 @@ function Workspace({
                   className="text-button"
                   onClick={() => void refresh()}
                 >
-                  立即重试
+                  Try again
                 </button>
               </div>
             )}
@@ -668,7 +678,7 @@ function Workspace({
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label="关闭错误提示"
+                  aria-label="Dismiss error"
                   onClick={() => setError("")}
                 >
                   <Icon name="close" size={14} />
@@ -682,7 +692,9 @@ function Workspace({
                     <span className="composer-symbol">
                       <Icon name="spark" size={19} />
                     </span>
-                    <label htmlFor="task-prompt">今天，想一起完成什么？</label>
+                    <label htmlFor="task-prompt">
+                      What would you like to build?
+                    </label>
                     <kbd>N</kbd>
                   </div>
                   <textarea
@@ -701,7 +713,7 @@ function Workspace({
                     }}
                     rows={3}
                     maxLength={20000}
-                    placeholder="描述你的目标、约束，以及怎样才算完成…"
+                    placeholder="Describe the goal, constraints, and what success looks like…"
                   />
                   <div className="composer-templates">
                     {templates.map((template) => (
@@ -713,8 +725,8 @@ function Workspace({
                         }
                         title={
                           prompt.trim()
-                            ? "将示例追加到现有草稿"
-                            : "使用示例需求"
+                            ? "Append this example to your draft"
+                            : "Use this example"
                         }
                         onClick={() => {
                           setPrompt((current) =>
@@ -741,11 +753,11 @@ function Workspace({
                     <div className="composer-agent">
                       <Icon name="agents" size={17} />
                       <select
-                        aria-label="选择执行 Agent"
+                        aria-label="Select an Agent"
                         value={agentId}
                         onChange={(event) => setAgentId(event.target.value)}
                       >
-                        <option value="">选择一位 Agent</option>
+                        <option value="">Choose an Agent</option>
                         {available.map((agent) => (
                           <option key={agent.id} value={agent.id}>
                             {agent.displayName} ·{" "}
@@ -766,12 +778,12 @@ function Workspace({
                       }
                     >
                       {busy
-                        ? "正在提交…"
+                        ? "Submitting…"
                         : selectedAgent?.status === "offline"
-                          ? "排队等待 Agent"
+                          ? "Queue for Agent"
                           : running || selectedAgent?.status === "busy"
-                            ? "加入队列"
-                            : "交给 Agent"}
+                            ? "Add to queue"
+                            : "Send to Agent"}
                       <Icon name="arrow" size={17} />
                     </button>
                   </div>
@@ -784,7 +796,7 @@ function Workspace({
                     <span>
                       {prompt.length
                         ? `${prompt.length.toLocaleString()} / 20,000`
-                        : "Ctrl / ⌘ + Enter 提交"}
+                        : "Ctrl / ⌘ + Enter to submit"}
                     </span>
                   </div>
                 </form>
@@ -802,10 +814,12 @@ function Workspace({
                     <span>
                       <strong>
                         {activeTasks.length}
-                        <small>进行中</small>
+                        <small>Active</small>
                       </strong>
                       <p>
-                        {running ? "有 Agent 正在接力" : "每一份进展都值得关注"}
+                        {running
+                          ? "An Agent is working"
+                          : "Follow work as it happens"}
                       </p>
                     </span>
                     <Icon name="chevron" size={13} />
@@ -823,12 +837,12 @@ function Workspace({
                     <span>
                       <strong>
                         {attention.length}
-                        <small>待处理</small>
+                        <small>Needs attention</small>
                       </strong>
                       <p>
                         {attention.length
-                          ? "有任务需要你看一眼"
-                          : "暂时没有待处理事项"}
+                          ? "Tasks need your attention"
+                          : "Nothing needs attention"}
                       </p>
                     </span>
                     <Icon name="chevron" size={13} />
@@ -846,9 +860,9 @@ function Workspace({
                     <span>
                       <strong>
                         {completed}
-                        <small>已完成</small>
+                        <small>Completed</small>
                       </strong>
-                      <p>每次交付，都留下证据</p>
+                      <p>Every delivery includes evidence</p>
                     </span>
                     <Icon name="chevron" size={13} />
                   </button>
@@ -856,10 +870,10 @@ function Workspace({
               </>
             )}
             {(view === "overview" || view === "tasks") && (
-              <section className="task-section" aria-label="团队任务">
+              <section className="task-section" aria-label="Team tasks">
                 <div className="section-heading">
                   <h2>
-                    {view === "overview" ? "团队任务" : "任务记录"}
+                    {view === "overview" ? "Team tasks" : "Task history"}
                     <span className="count">{snapshot.tasks.length}</span>
                   </h2>
                   <label className="mine-filter">
@@ -868,11 +882,14 @@ function Workspace({
                       checked={mine}
                       onChange={(event) => setMine(event.target.checked)}
                     />
-                    只看我发起的
+                    Requested by me
                   </label>
                 </div>
                 <div className="task-toolbar">
-                  <nav className="filter-tabs" aria-label="任务状态筛选">
+                  <nav
+                    className="filter-tabs"
+                    aria-label="Filter tasks by status"
+                  >
                     {filters.map((item) => (
                       <button
                         type="button"
@@ -894,13 +911,13 @@ function Workspace({
                       ref={searchRef}
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
-                      placeholder="搜索任务、队友…"
-                      aria-label="搜索任务"
+                      placeholder="Search tasks or teammates…"
+                      aria-label="Search tasks"
                     />
                     {query ? (
                       <button
                         type="button"
-                        aria-label="清空搜索"
+                        aria-label="Clear search"
                         onClick={() => setQuery("")}
                       >
                         <Icon name="close" size={13} />
@@ -923,14 +940,14 @@ function Workspace({
                     <EmptyState
                       title={
                         snapshot.tasks.length
-                          ? "没有匹配的任务"
-                          : "第一份协作，从你开始"
+                          ? "No matching tasks"
+                          : "Start your first task"
                       }
                     >
                       <p>
                         {snapshot.tasks.length
-                          ? "试试其他关键词，或调整筛选条件。"
-                          : "描述一个具体目标，再选择一位 Agent。"}
+                          ? "Try another search or adjust the filters."
+                          : "Describe a specific goal, then choose an Agent."}
                       </p>
                       <button
                         type="button"
@@ -943,18 +960,21 @@ function Workspace({
                           } else focusComposer();
                         }}
                       >
-                        {snapshot.tasks.length ? "清除筛选" : "创建第一个任务"}
+                        {snapshot.tasks.length
+                          ? "Clear filters"
+                          : "Create your first task"}
                       </button>
                     </EmptyState>
                   )}
                 </div>
                 <div className="task-list-footer">
                   <span>
-                    {tasks.length} 项任务{mine ? " · 我发起的" : " · 团队共享"}
+                    {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+                    {mine ? " · Requested by me" : " · Shared with the team"}
                   </span>
                   <span>
                     <Icon name="shield" size={12} />
-                    代码任务按项目串行执行
+                    One coding task at a time per project
                   </span>
                 </div>
               </section>
@@ -974,14 +994,14 @@ function Workspace({
                         </span>
                       </div>
                       <h2>{agent.displayName}</h2>
-                      <p>{agent.ownerName} 共享的本地编码 Agent</p>
+                      <p>Local coding Agent shared by {agent.ownerName}</p>
                       <dl>
                         <div>
-                          <dt>最近连接</dt>
+                          <dt>Last connected</dt>
                           <dd>{timeLabel(agent.lastSeenAt, true)}</dd>
                         </div>
                         <div>
-                          <dt>当前任务</dt>
+                          <dt>Current task</dt>
                           <dd>
                             {snapshot.tasks
                               .find(
@@ -991,7 +1011,7 @@ function Workspace({
                                     task.status,
                                   ),
                               )
-                              ?.prompt.split("\n")[0] ?? "暂无执行中的任务"}
+                              ?.prompt.split("\n")[0] ?? "No active task"}
                           </dd>
                         </div>
                       </dl>
@@ -1001,7 +1021,7 @@ function Workspace({
                         disabled={agent.status === "paused"}
                         onClick={() => chooseAgent(agent.id)}
                       >
-                        交给这位 Agent
+                        Use this Agent
                         <Icon name="arrow" size={15} />
                       </button>
                       {!simulated && agent.ownerMemberId === snapshot.me.id && (
@@ -1015,7 +1035,9 @@ function Workspace({
                             name={agent.status === "paused" ? "play" : "pause"}
                             size={14}
                           />
-                          {agent.status === "paused" ? "恢复共享" : "暂停共享"}
+                          {agent.status === "paused"
+                            ? "Resume sharing"
+                            : "Pause sharing"}
                         </button>
                       )}
                     </article>
@@ -1023,9 +1045,12 @@ function Workspace({
                 ) : (
                   <EmptyState
                     icon="agents"
-                    title="团队的第一位 Agent，等你接入"
+                    title="Connect your team’s first Agent"
                   >
-                    <p>连接本地 Runner 后，团队就能开始派发任务。</p>
+                    <p>
+                      Connect a local Runner so your team can start assigning
+                      tasks.
+                    </p>
                   </EmptyState>
                 )}
                 <button
@@ -1036,16 +1061,16 @@ function Workspace({
                   <span>
                     <Icon name="plus" size={24} />
                   </span>
-                  <strong>接入我的 Agent</strong>
-                  <p>让团队多一份能力</p>
+                  <strong>Connect Agent</strong>
+                  <p>Bring your Agent to the team</p>
                 </button>
               </section>
             )}
             {view === "activity" && (
               <section className="activity-page">
                 <div className="section-heading">
-                  <h2>最近的协作记录</h2>
-                  <span className="muted small">按时间倒序</span>
+                  <h2>Recent activity</h2>
+                  <span className="muted small">Newest first</span>
                 </div>
                 {messages.length ? (
                   messages.map((message) => (
@@ -1063,14 +1088,14 @@ function Workspace({
                       <span>
                         <strong>
                           {message.role === "system"
-                            ? "系统"
+                            ? "System"
                             : message.memberName}
                           <small>
                             {message.role === "agent"
-                              ? "返回执行记录"
+                              ? "returned a result"
                               : message.role === "member"
-                                ? "补充了项目上下文"
-                                : "更新了任务"}
+                                ? "added project context"
+                                : "updated the task"}
                           </small>
                         </strong>
                         <p>{message.content}</p>
@@ -1082,8 +1107,14 @@ function Workspace({
                     </button>
                   ))
                 ) : (
-                  <EmptyState icon="activity" title="记录，随协作而来">
-                    <p>发起一项任务后，这里会汇集团队的需求、讨论和结果。</p>
+                  <EmptyState
+                    icon="activity"
+                    title="Your team’s work will appear here"
+                  >
+                    <p>
+                      Create a task to start a shared record of requests,
+                      discussions, and results.
+                    </p>
                   </EmptyState>
                 )}
               </section>
@@ -1099,12 +1130,12 @@ function Workspace({
           <aside className="right-rail">
             <section className="team-section">
               <div className="section-heading">
-                <h2>你的 Agent 队友</h2>
+                <h2>Your Agent teammates</h2>
                 <span className="count">{snapshot.agents.length}</span>
               </div>
               <p className="rail-caption">
                 <span className="live-dot" />
-                {online} 位在线待命<span>点击选择执行者</span>
+                {online} available<span>Select an Agent</span>
               </p>
               <div className="agent-roster">
                 {snapshot.agents.map((agent, index) => (
@@ -1123,7 +1154,7 @@ function Workspace({
                 onClick={() => setModal("connect")}
               >
                 <Icon name="plus" size={15} />
-                接入我的 Agent
+                Connect Agent
               </button>
             </section>
             <section className="execution-card">
@@ -1137,15 +1168,15 @@ function Workspace({
                 <div>
                   <strong>
                     {running?.status === "waiting_for_owner"
-                      ? "等待所有者处理"
+                      ? "Waiting for the owner"
                       : running
-                        ? "协作正在进行"
-                        : "准备好，开始下一件事"}
+                        ? "Work in progress"
+                        : "Ready for the next goal"}
                   </strong>
                   <p>
                     {running
                       ? `${running.selectedAgentName} · ${taskStates[running.status].label}`
-                      : "执行位空闲，等待好想法"}
+                      : "No task is running. What’s next?"}
                   </p>
                 </div>
               </div>
@@ -1166,13 +1197,13 @@ function Workspace({
             </section>
             <section className="recent-section">
               <div className="section-heading">
-                <h2>最近动态</h2>
+                <h2>Recent updates</h2>
                 <button
                   type="button"
                   className="text-button"
                   onClick={() => setView("activity")}
                 >
-                  全部
+                  All
                   <Icon name="arrow" size={13} />
                 </button>
               </div>
@@ -1200,19 +1231,21 @@ function Workspace({
                   </button>
                 ))}
               {!snapshot.tasks.length && (
-                <p className="muted small">团队的第一条动态，从新任务开始。</p>
+                <p className="muted small">
+                  Create a task to start your team’s activity feed.
+                </p>
               )}
             </section>
             <div className="trust-card">
               <Icon name="shield" size={21} />
-              <strong>能力共享，凭据留在本地。</strong>
+              <strong>Shared capability. Local credentials.</strong>
               <p>
-                Codex 与 Git 凭据留在 Agent
-                所有者的电脑。任务结果与执行记录供团队共同审阅。
+                Codex and Git credentials stay on the Agent owner’s computer.
+                Results and execution records are shared with the team.
               </p>
               <p>
-                运行依赖 Runner 所在设备保持在线；关闭浏览器不会停止
-                Runner，关闭其所在电脑则会中断执行。
+                The Runner’s device must stay online. Closing the browser does
+                not stop it; shutting down its computer interrupts execution.
               </p>
               <span>LOCAL AGENTS. SHARED PROGRESS.</span>
             </div>
@@ -1252,10 +1285,10 @@ function Workspace({
             setAgentId(task.selectedAgentId);
             setNotice(
               nextPrompt.length > 20000 || nextContext.length > 10000
-                ? "完整反馈和背景已带入草稿。内容超出提交上限，请在编辑区删减后提交。"
+                ? "Your full feedback and context are in the draft. Shorten the content to meet the submission limits."
                 : prompt.trim()
-                  ? "反馈已追加到现有草稿，请核对目标与验收标准。"
-                  : "已带入上次结果与本次反馈，请确认新的验收标准后提交。",
+                  ? "Feedback was added to your existing draft. Check the goal and acceptance criteria."
+                  : "The previous result and your feedback are in the draft. Confirm the new acceptance criteria before submitting.",
             );
             closeTask();
             focusComposer();
@@ -1264,15 +1297,18 @@ function Workspace({
         />
       )}
       {selectedId && !selectedTask && (
-        <Modal title="任务链接" onClose={closeTask}>
-          <EmptyState title="这里找不到这项任务">
-            <p>任务可能属于另一个工作空间，或演示数据已经重置。</p>
+        <Modal title="Task link" onClose={closeTask}>
+          <EmptyState title="Task not found">
+            <p>
+              The task may belong to another workspace, or the demo may have
+              been reset.
+            </p>
             <button
               type="button"
               className="button button-secondary"
               onClick={closeTask}
             >
-              返回工作台
+              Back to workbench
             </button>
           </EmptyState>
         </Modal>
@@ -1289,11 +1325,13 @@ function Workspace({
         />
       )}
       {modal === "reset" && (
-        <Modal title="重置演示工作空间" onClose={() => setModal(null)}>
+        <Modal title="Reset demo workspace" onClose={() => setModal(null)}>
           <div className="management-content">
-            <h2>重新开始一轮体验？</h2>
+            <h2>Start the demo again?</h2>
             <p className="muted">
-              将删除当前浏览器中的模拟任务和讨论，恢复初始示例。不会影响真实仓库或团队数据。
+              This removes simulated tasks and discussions in this browser and
+              restores the initial examples. Real repositories and team data are
+              unaffected.
             </p>
             <div className="modal-actions">
               <button
@@ -1301,7 +1339,7 @@ function Workspace({
                 className="button button-secondary"
                 onClick={() => setModal(null)}
               >
-                保留当前演示
+                Keep current demo
               </button>
               <button
                 type="button"
@@ -1316,10 +1354,12 @@ function Workspace({
                   setMine(false);
                   closeTask();
                   setModal(null);
-                  setNotice("演示已恢复，随时开始新一轮协作。");
+                  setNotice(
+                    "The demo has been reset. You’re ready to explore again.",
+                  );
                 }}
               >
-                重置演示
+                Reset demo
               </button>
             </div>
           </div>
@@ -1347,7 +1387,10 @@ export function App() {
       else
         setState({
           kind: "error",
-          message: cause instanceof Error ? cause.message : "工作台加载失败",
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "Could not load the workspace.",
         });
     }
   }, []);
@@ -1359,7 +1402,7 @@ export function App() {
       <main className="loading-screen">
         <Logo />
         <span className="loading-line" />
-        <p>正在连接你的团队…</p>
+        <p>Connecting to your team…</p>
       </main>
     );
   if (state.kind === "claim") {
@@ -1375,11 +1418,11 @@ export function App() {
     return (
       <main className="loading-screen">
         <Logo />
-        <h1>暂时没能连接工作台</h1>
+        <h1>Could not connect to the workspace</h1>
         <p>{state.message}</p>
         <button type="button" className="button button-primary" onClick={load}>
           <Icon name="refresh" size={16} />
-          重新连接
+          Reconnect
         </button>
       </main>
     );

@@ -82,7 +82,11 @@ export function TaskDetail({
       await onRefresh();
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "操作失败，请重试");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Action failed. Please try again.",
+      );
       return false;
     } finally {
       setBusy(false);
@@ -102,7 +106,7 @@ export function TaskDetail({
       } catch {
         // Saving the server message succeeded even when local storage is blocked.
       }
-      setNotice("补充说明已保存到项目上下文。");
+      setNotice("Your note was saved to the project context.");
     }
   }
   function downloadReport() {
@@ -118,37 +122,39 @@ export function TaskDetail({
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    setNotice("已向浏览器发起下载。如果没有收到文件，也可以复制下方完整记录。");
+    setNotice(
+      "Download requested. If the file does not appear, copy the full record below.",
+    );
   }
   const explanation =
     task.status === "waiting_for_agent"
-      ? `${task.selectedAgentName} 当前无法接单。任务尚未开始，可等待它上线，或改派给其他 Agent。`
+      ? `${task.selectedAgentName} is unavailable. This task has not started; wait for the Agent to reconnect or reassign it.`
       : task.status === "waiting_for_owner"
-        ? `请 ${task.selectedAgentOwnerName} 在本机 Codex 处理审批。当前任务仍占用项目执行位，后续任务会继续排队。`
+        ? `${task.selectedAgentOwnerName} needs to handle approval in their local Codex. This task still holds the project execution slot; later tasks remain queued.`
         : task.status === "queued"
-          ? "任务已进入项目队列。前面的任务完成且所选 Agent 可用时，会自动开始。"
+          ? "This task is queued. It will start when earlier work finishes and the selected Agent is available."
           : task.status === "running"
-            ? "Agent 正在处理需求。项目按顺序执行代码任务，进度会自动更新。"
+            ? "The Agent is working. Coding tasks run one at a time per project; progress updates automatically."
             : task.status === "needs_attention"
               ? assigned?.status === "paused"
-                ? "本次执行未能完成，原 Agent 已暂停。重新排队后可改派给其他 Agent，或等待所有者恢复共享。"
-                : "本次执行未能完成。先查看错误和测试输出，补充说明后可重新排队。"
+                ? "This run did not complete and the Agent is paused. Requeue the task to reassign it, or wait for the owner to resume sharing."
+                : "This run did not complete. Review the error and test output, add any useful context, then requeue it."
               : task.status === "canceled"
-                ? "任务在开始执行前已取消。记录保留，便于团队追溯。"
-                : "执行结果已返回。请查看代码差异和测试原始输出，再决定是否接受这次变更。";
+                ? "This task was canceled before execution. Its record remains available to the team."
+                : "The result is ready. Review the changes and raw test output before deciding whether to accept the work.";
   return (
-    <Modal title="目标与交付" onClose={onClose} wide>
+    <Modal title="Goal and delivery" onClose={onClose} wide>
       <div className="detail-intro">
         <div className="detail-status">
           <TaskBadge status={task.status} />
           <span className="mono muted">{task.id.slice(0, 12)}</span>
-          {simulated && <span className="demo-tag">模拟证据</span>}
+          {simulated && <span className="demo-tag">Simulated evidence</span>}
         </div>
         <h2>{task.prompt.split("\n")[0]}</h2>
         <div className="detail-facts">
           <span>
             <Avatar name={task.requesterName} small />
-            {task.requesterName} 发起
+            Requested by {task.requesterName}
           </span>
           <span>
             <Icon name="agents" size={15} />
@@ -160,13 +166,13 @@ export function TaskDetail({
           </span>
         </div>
       </div>
-      <nav className="detail-tabs" aria-label="任务详情视图">
+      <nav className="detail-tabs" aria-label="Task detail views">
         {(
           [
-            { id: "overview", label: "交付概览", icon: "grid" },
-            { id: "diff", label: "代码变更", icon: "code" },
-            { id: "tests", label: "测试输出", icon: "terminal" },
-            { id: "activity", label: "协作记录", icon: "activity" },
+            { id: "overview", label: "Overview", icon: "grid" },
+            { id: "diff", label: "Code changes", icon: "code" },
+            { id: "tests", label: "Test output", icon: "terminal" },
+            { id: "activity", label: "Activity", icon: "activity" },
           ] as const
         ).map((item) => (
           <button
@@ -188,20 +194,21 @@ export function TaskDetail({
         {tab === "export" && (
           <section className="export-panel">
             <div className="section-label">TAKE YOUR WORK WITH YOU</div>
-            <h3>把这次协作，完整带走。</h3>
+            <h3>Take the full record with you.</h3>
             <p className="muted">
-              导出当前任务的要求、执行者、结果、Diff、测试和协作记录。模拟证据会保留明确标记。
+              Export the requirements, assigned Agent, results, changes, tests,
+              and activity. Simulated evidence stays clearly labeled.
             </p>
             <textarea
               readOnly
-              aria-label="Markdown 导出内容"
+              aria-label="Markdown export"
               value={evidenceReport(task, simulated)}
               rows={12}
             />
             <div className="modal-actions">
               <CopyButton
                 value={evidenceReport(task, simulated)}
-                label="复制 Markdown"
+                label="Copy Markdown"
               />
               <button
                 type="button"
@@ -209,7 +216,7 @@ export function TaskDetail({
                 onClick={downloadReport}
               >
                 <Icon name="download" size={15} />
-                下载 Markdown
+                Download Markdown
               </button>
             </div>
           </section>
@@ -234,8 +241,8 @@ export function TaskDetail({
               <div>
                 <strong>
                   {task.status === "completed"
-                    ? "交付已就绪，等你审阅"
-                    : "接下来会发生什么"}
+                    ? "Ready for your review"
+                    : "What happens next"}
                 </strong>
                 <p>{explanation}</p>
               </div>
@@ -244,7 +251,7 @@ export function TaskDetail({
               <section className="detail-section">
                 <h3>
                   <Icon name="alert" size={16} />
-                  执行错误
+                  Execution error
                 </h3>
                 <pre className="error-output">{task.error}</pre>
               </section>
@@ -252,15 +259,15 @@ export function TaskDetail({
             {task.result ? (
               <section className="detail-section result-section">
                 <div className="section-label">DELIVERY NOTE</div>
-                <h3>执行结果</h3>
+                <h3>Result</h3>
                 <div className="prose">{task.result}</div>
               </section>
             ) : (
               <section className="detail-section">
-                <h3>当前进度</h3>
+                <h3>Current progress</h3>
                 <p className="prose muted">
                   {task.progress ||
-                    "任务等待开始。这里会显示 Agent 返回的进度。"}
+                    "Waiting to start. Progress from the Agent will appear here."}
                 </p>
               </section>
             )}
@@ -268,9 +275,11 @@ export function TaskDetail({
               <button type="button" onClick={() => setTab("diff")}>
                 <Icon name="code" />
                 <span>
-                  代码变更
+                  Code changes
                   <strong>
-                    {files.length ? `${files.length} 个文件` : "尚无差异"}
+                    {files.length
+                      ? `${files.length} ${files.length === 1 ? "file" : "files"}`
+                      : "No changes yet"}
                   </strong>
                 </span>
                 {files.length > 0 && (
@@ -284,19 +293,19 @@ export function TaskDetail({
               <button type="button" onClick={() => setTab("tests")}>
                 <Icon name="terminal" />
                 <span>
-                  测试记录
+                  Test evidence
                   <strong>
                     {task.brief?.mode === "verified"
                       ? task.workflow?.testStatus === "passed"
-                        ? `${simulated ? "模拟 · " : ""}测试通过`
+                        ? `${simulated ? "Simulated · " : ""}Tests passed`
                         : task.workflow?.testStatus === "failed"
-                          ? "测试失败"
+                          ? "Tests failed"
                           : task.workflow?.testStatus === "not_configured"
-                            ? "未配置测试命令"
-                            : "尚未运行"
+                            ? "Test command not configured"
+                            : "Not run"
                       : task.testOutput.trim()
-                        ? "有输出 · 查看详情"
-                        : "未提供测试输出"}
+                        ? "Output available · View details"
+                        : "No test output"}
                   </strong>
                 </span>
                 <Icon name="chevron" size={15} />
@@ -306,26 +315,28 @@ export function TaskDetail({
               <div className="commit-box">
                 <span>
                   <Icon name="branch" size={16} />
-                  {simulated ? "模拟提交" : "Git 提交"}
+                  {simulated ? "Simulated commit" : "Git commit"}
                 </span>
                 <code>{task.commitSha}</code>
                 <CopyButton value={task.commitSha} />
               </div>
             )}
             <details className="original-request">
-              <summary>查看完整任务要求</summary>
+              <summary>View the full request</summary>
               <p className="prose">{task.prompt}</p>
               {task.brief?.context && (
                 <>
-                  <h4>项目背景与已有决定</h4>
+                  <h4>Context and decisions</h4>
                   <p className="prose">{task.brief.context}</p>
                 </>
               )}
             </details>
             {canManage && waiting && (
               <section className="reassign-box">
-                <label htmlFor="reassign-agent">重新指派</label>
-                <p>换一位队友接手，保留原任务和讨论。</p>
+                <label htmlFor="reassign-agent">Reassign</label>
+                <p>
+                  Assign another Agent while preserving the task and discussion.
+                </p>
                 <div className="inline-form">
                   <select
                     id="reassign-agent"
@@ -354,7 +365,7 @@ export function TaskDetail({
                     }
                     onClick={() => action("reassign", { agentId })}
                   >
-                    更新指派
+                    Update assignment
                   </button>
                 </div>
               </section>
@@ -366,7 +377,7 @@ export function TaskDetail({
             <div className="diff-review">
               <div className="diff-file-list">
                 <div className="file-list-heading">
-                  变更文件 <span>{files.length}</span>
+                  Changed files <span>{files.length}</span>
                 </div>
                 {files.map((item, index) => (
                   <button
@@ -389,13 +400,13 @@ export function TaskDetail({
                 <div className="diff-content">
                   <header>
                     <code>{file.path}</code>
-                    <CopyButton value={task.diff} label="复制完整 Diff" />
+                    <CopyButton value={task.diff} label="Copy full diff" />
                   </header>
                   <section
                     className="diff-scroll"
                     // biome-ignore lint/a11y/noNoninteractiveTabindex: The scrollable patch needs keyboard focus for horizontal and vertical scrolling.
                     tabIndex={0}
-                    aria-label="代码差异，包含原始行号和变更行号"
+                    aria-label="Code diff with original and updated line numbers"
                   >
                     <table className="diff-table">
                       <tbody>
@@ -423,11 +434,11 @@ export function TaskDetail({
               icon="code"
               title={
                 task.status === "completed"
-                  ? "本次没有代码差异"
-                  : "还没有可查看的变更"
+                  ? "No code changes in this run"
+                  : "No changes to review yet"
               }
             >
-              <p>Agent 返回的原始 Diff 会显示在这里。</p>
+              <p>The Agent’s original diff will appear here.</p>
             </EmptyState>
           ))}
         {tab === "tests" && (
@@ -435,11 +446,13 @@ export function TaskDetail({
             <div className="test-notice">
               <Icon name="terminal" />
               <div>
-                <strong>{simulated ? "模拟测试记录" : "测试原始输出"}</strong>
+                <strong>
+                  {simulated ? "Simulated test evidence" : "Raw test output"}
+                </strong>
                 <p>
                   {simulated
-                    ? "以下内容为演示数据，未实际运行测试。"
-                    : "保留 Agent 返回的输出。任务完成状态不等于测试全部通过。"}
+                    ? "This is simulated output. No tests were executed."
+                    : "This is the output returned by the Agent. A completed task does not by itself prove every test passed."}
                 </p>
               </div>
               {task.testOutput && <CopyButton value={task.testOutput} />}
@@ -449,13 +462,16 @@ export function TaskDetail({
                 className="terminal-output"
                 // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need focus to scroll long raw test output in either direction.
                 tabIndex={0}
-                aria-label="测试原始输出"
+                aria-label="Raw test output"
               >
                 <pre style={{ margin: 0 }}>{task.testOutput}</pre>
               </section>
             ) : (
-              <EmptyState icon="terminal" title="未提供测试输出">
-                <p>当前没有测试证据，无法据此判断测试是否通过。</p>
+              <EmptyState icon="terminal" title="No test output">
+                <p>
+                  No test evidence is available. Test success cannot be
+                  inferred.
+                </p>
               </EmptyState>
             )}
           </>
@@ -480,7 +496,7 @@ export function TaskDetail({
                       <header>
                         <strong>
                           {message.role === "system"
-                            ? "系统"
+                            ? "System"
                             : message.memberName}
                         </strong>
                         <span>{message.role === "agent" ? "Agent" : ""}</span>
@@ -491,32 +507,33 @@ export function TaskDetail({
                   </article>
                 ))
               ) : (
-                <EmptyState icon="activity" title="这里是团队的共同上下文">
-                  <p>需求、补充说明和 Agent 的回复都会保留在这里。</p>
+                <EmptyState icon="activity" title="Your team’s shared context">
+                  <p>Requests, notes, and Agent responses are kept here.</p>
                 </EmptyState>
               )}
             </div>
             <form onSubmit={sendReply} className="reply-form">
-              <label htmlFor="task-reply">反馈与补充说明</label>
+              <label htmlFor="task-reply">Feedback and notes</label>
               <textarea
                 id="task-reply"
                 value={reply}
                 onChange={(event) => setReply(event.target.value)}
-                placeholder="补充验收标准、约束或排查线索…"
+                placeholder="Add feedback, constraints, or debugging context…"
                 maxLength={20000}
                 rows={3}
               />
               <div>
                 <p>
-                  保存到共享上下文。本轮目标与验收标准在分配时冻结；
-                  新反馈可用于下一轮目标。
+                  Notes are saved to shared context. The current goal and
+                  criteria were frozen when assigned; use new feedback in a
+                  follow-up goal.
                 </p>
                 <button
                   className="button button-primary"
                   type="submit"
                   disabled={busy || !reply.trim()}
                 >
-                  {busy ? "保存中…" : "保存说明"}
+                  {busy ? "Saving…" : "Save note"}
                   <Icon name="arrow" size={16} />
                 </button>
               </div>
@@ -526,8 +543,11 @@ export function TaskDetail({
             ) && (
               <div className="feedback-next-goal">
                 <div>
-                  <strong>把反馈带到下一次改进</strong>
-                  <p>以上次交付和本次反馈生成可编辑的目标草稿，重新验收。</p>
+                  <strong>Turn feedback into the next improvement</strong>
+                  <p>
+                    Create an editable draft from this result and your feedback,
+                    with fresh acceptance checks.
+                  </p>
                 </div>
                 <button
                   className="button button-secondary"
@@ -536,12 +556,12 @@ export function TaskDetail({
                   onClick={() => {
                     if (!onFollowup(task, reply.trim()))
                       setError(
-                        "工作台中已有较长草稿。请先整理草稿，避免合并时丢失内容。",
+                        "The workspace draft is too long to merge. Shorten it first to preserve your content.",
                       );
                   }}
                 >
                   <Icon name="plus" size={15} />
-                  生成后续目标
+                  Create follow-up goal
                 </button>
               </div>
             )}
@@ -549,10 +569,13 @@ export function TaskDetail({
         )}
         {releaseOpen && (
           <div className="release-confirm">
-            <strong>确认 Runner 已在所有者电脑上停止</strong>
+            <strong>
+              Confirm the Runner has stopped on the owner’s computer
+            </strong>
             <p>
-              释放执行位会暂停该
-              Agent，并将任务标记为待处理。仍在运行的本地进程需要由所有者停止。
+              Releasing the execution slot pauses the Agent and marks the task
+              as needing attention. The owner must stop any local process that
+              is still running.
             </p>
             <label>
               <input
@@ -560,7 +583,7 @@ export function TaskDetail({
                 checked={stopped}
                 onChange={(event) => setStopped(event.target.checked)}
               />
-              我已确认所有者停止了本地 Runner
+              I have confirmed the owner stopped the local Runner
             </label>
             <button
               className="button button-danger"
@@ -571,7 +594,7 @@ export function TaskDetail({
                   setReleaseOpen(false);
               }}
             >
-              确认释放执行位
+              Confirm release
             </button>
           </div>
         )}
@@ -585,7 +608,7 @@ export function TaskDetail({
               disabled={busy}
               onClick={() => action("cancel")}
             >
-              取消任务
+              Cancel task
             </button>
           )}
           {canRetry && task.status === "needs_attention" && (
@@ -596,7 +619,7 @@ export function TaskDetail({
               onClick={() => action("retry")}
             >
               <Icon name="refresh" size={16} />
-              {busy ? "排队中…" : "重新排队"}
+              {busy ? "Requeuing…" : "Requeue task"}
             </button>
           )}
           {canRelease && (
@@ -606,7 +629,7 @@ export function TaskDetail({
               disabled={busy}
               onClick={() => setReleaseOpen(true)}
             >
-              紧急释放
+              Emergency release
             </button>
           )}
         </div>
@@ -617,7 +640,7 @@ export function TaskDetail({
                 ? evidenceReport(task, simulated)
                 : `${location.href.split("#")[0]}#task-${task.id}`
             }
-            label={tab === "export" ? "复制 Markdown" : "任务链接"}
+            label={tab === "export" ? "Copy Markdown" : "Task link"}
           />
           <button
             type="button"
@@ -627,7 +650,7 @@ export function TaskDetail({
             }
           >
             <Icon name="download" size={15} />
-            {tab === "export" ? "下载 Markdown" : "导出记录"}
+            {tab === "export" ? "Download Markdown" : "Export"}
           </button>
         </div>
       </footer>

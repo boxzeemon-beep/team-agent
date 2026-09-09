@@ -41,15 +41,15 @@ export function criteriaLines(text: string): string[] {
 }
 export function goalDraftError(draft: GoalDraft): string {
   if (draft.context.length > 10000)
-    return "项目背景最多 10,000 字，完整草稿已保留，请删减后提交。";
+    return "Context is limited to 10,000 characters. Your full draft is saved; shorten it before submitting.";
   if (draft.mode === "direct") return "";
   const criteria = criteriaLines(draft.criteria);
   if (draft.mode === "verified" && !criteria.length)
-    return "写下一条可核实的验收标准，再交给 Agent。";
+    return "Add at least one verifiable acceptance criterion before submitting.";
   if (criteria.length > 12)
-    return "最多保留 12 条验收标准，让每一条都能被认真检查。";
+    return "Use up to 12 acceptance criteria so each one can be reviewed.";
   if (criteria.some((line) => line.length > 500))
-    return "每条验收标准最多 500 字，请拆成清晰的小项。";
+    return "Each criterion can contain up to 500 characters. Split longer ones into specific requirements.";
   return "";
 }
 export function toGoalBrief(draft: GoalDraft): GoalBrief {
@@ -73,28 +73,28 @@ export function GoalComposer({
   return (
     <div className="goal-composer">
       <div className="goal-mode-row">
-        <fieldset className="goal-mode-control" aria-label="执行方式">
+        <fieldset className="goal-mode-control" aria-label="Execution mode">
           <button
             type="button"
             aria-pressed={verified}
             onClick={() => onChange({ ...value, mode: "verified" })}
           >
             <Icon name="shield" size={15} />
-            实现并验收
+            Verified goal
           </button>
           <button
             type="button"
             aria-pressed={!verified}
             onClick={() => onChange({ ...value, mode: "direct" })}
           >
-            直接执行
+            Direct task
           </button>
         </fieldset>
         {verified && (
           <label className="iteration-control">
-            最多
+            Up to
             <select
-              aria-label="最多实现与验收轮数"
+              aria-label="Maximum implementation and review rounds"
               value={value.maxIterations}
               onChange={(event) =>
                 onChange({
@@ -103,9 +103,9 @@ export function GoalComposer({
                 })
               }
             >
-              <option value={1}>1 轮</option>
-              <option value={2}>2 轮</option>
-              <option value={3}>3 轮</option>
+              <option value={1}>1 round</option>
+              <option value={2}>2 rounds</option>
+              <option value={3}>3 rounds</option>
             </select>
           </label>
         )}
@@ -113,8 +113,8 @@ export function GoalComposer({
       {verified && (
         <div className="criteria-editor">
           <label htmlFor="goal-criteria">
-            <span>怎样才算完成？</span>
-            <small>每行一条 · 独立会话逐项检查</small>
+            <span>What does success look like?</span>
+            <small>One per line · Reviewed in a separate session</small>
           </label>
           <textarea
             id="goal-criteria"
@@ -125,12 +125,13 @@ export function GoalComposer({
             rows={3}
             maxLength={6500}
             placeholder={
-              "例如：刷新页面后仍保留登录状态\n退出登录后不能访问受保护页面\n回归测试覆盖以上两种情况"
+              "For example: Stay signed in after refreshing the page\nProtected pages cannot be accessed after signing out\nRegression tests cover both behaviors"
             }
           />
           <p>
             <Icon name="refresh" size={13} />
-            测试或审查未通过时，带着证据继续修订；达到轮数上限后交回你处理。
+            Failed tests or reviews lead to another revision. If the round limit
+            is reached, the goal returns to you for attention.
           </p>
         </div>
       )}
@@ -140,11 +141,11 @@ export function GoalComposer({
       >
         <summary>
           <Icon name="file" size={14} />
-          项目背景与已有决定{" "}
-          <span>{value.context.trim() ? "已补充" : "可选"}</span>
+          Context and decisions{" "}
+          <span>{value.context.trim() ? "Added" : "Optional"}</span>
         </summary>
         <label htmlFor="goal-context" className="sr-only">
-          项目背景与已有决定
+          Context and decisions
         </label>
         <textarea
           id="goal-context"
@@ -154,16 +155,17 @@ export function GoalComposer({
           }
           rows={3}
           maxLength={10000}
-          placeholder="为什么做这件事、已确定的方案、需要保留的行为，以及相关讨论或文档链接…"
+          placeholder="Why this matters, decisions already made, behavior to preserve, and relevant discussions or documents…"
         />
         <p>
-          这些内容会与目标一起交给执行者和审查者。链接本身不代表 Agent
-          已获得访问权限。
+          This context is shared with both the implementer and reviewer. Adding
+          a link does not grant the Agent access to it.
         </p>
       </details>
       {!verified && (
         <p className="direct-mode-note">
-          运行一次 Agent，使用项目配置的测试与发布流程；不增加独立验收会话。
+          Run the Agent once, then use the configured test and Git publishing
+          workflow. No independent acceptance review is added.
         </p>
       )}
     </div>
@@ -171,34 +173,36 @@ export function GoalComposer({
 }
 
 export const workflowPhases: Record<GoalWorkflow["phase"], string> = {
-  implementing: "正在实现",
-  testing: "运行测试",
-  reviewing: "独立审查",
-  revising: "根据证据修订",
-  publishing: "发布交付",
-  completed: "验收完成",
-  blocked: "需要你处理",
+  implementing: "Implementing",
+  testing: "Testing",
+  reviewing: "Independent review",
+  revising: "Revising",
+  publishing: "Publishing",
+  completed: "Acceptance complete",
+  blocked: "Needs attention",
 };
 export function taskWorkflowLabel(task: Task): string {
-  if (task.status === "canceled") return "已取消";
-  if (task.status === "needs_attention") return "需要你处理";
-  if (task.status === "queued") return "等待执行位";
-  if (task.status === "waiting_for_agent") return "等待 Runner";
-  if (task.status === "waiting_for_owner") return "等待所有者确认";
-  return task.workflow ? workflowPhases[task.workflow.phase] : "目标验收";
+  if (task.status === "canceled") return "Canceled";
+  if (task.status === "needs_attention") return "Needs attention";
+  if (task.status === "queued") return "Waiting in queue";
+  if (task.status === "waiting_for_agent") return "Waiting for Runner";
+  if (task.status === "waiting_for_owner") return "Waiting for owner approval";
+  return task.workflow
+    ? workflowPhases[task.workflow.phase]
+    : "Goal acceptance";
 }
 const testStates = {
-  not_run: "尚未运行",
-  passed: "测试通过",
-  failed: "测试失败",
-  not_configured: "未配置测试命令",
+  not_run: "Not run",
+  passed: "Tests passed",
+  failed: "Tests failed",
+  not_configured: "Test command not configured",
 };
-const checkStates = { pass: "通过", fail: "未通过", unknown: "尚无法确认" };
+const checkStates = { pass: "Passed", fail: "Failed", unknown: "Unverified" };
 const steps = [
-  { id: "implementing", label: "实现" },
-  { id: "testing", label: "测试" },
-  { id: "reviewing", label: "审查" },
-  { id: "publishing", label: "交付" },
+  { id: "implementing", label: "Implement" },
+  { id: "testing", label: "Test" },
+  { id: "reviewing", label: "Review" },
+  { id: "publishing", label: "Deliver" },
 ];
 
 export function WorkflowEvidence({
@@ -228,23 +232,23 @@ export function WorkflowEvidence({
   return (
     <section
       className={`workflow-evidence ${phase === "blocked" ? "is-blocked" : ""}`}
-      aria-label="目标验收"
+      aria-label="Goal acceptance"
     >
       <div className="workflow-evidence-heading">
         <div>
           <span className="section-label">GOAL → EVIDENCE → DELIVERY</span>
           <h3>
             <Icon name="shield" size={17} />
-            目标验收
+            Goal acceptance
           </h3>
         </div>
         <span className="workflow-round">
           {workflow && !pending
-            ? `第 ${workflow.iteration} / ${brief.maxIterations} 轮`
-            : `最多 ${brief.maxIterations} 轮`}
+            ? `Round ${workflow.iteration} of ${brief.maxIterations}`
+            : `Up to ${brief.maxIterations} ${brief.maxIterations === 1 ? "round" : "rounds"}`}
         </span>
       </div>
-      <ol className="workflow-steps" aria-label="执行阶段">
+      <ol className="workflow-steps" aria-label="Workflow stages">
         {steps.map((step, index) => (
           <li
             key={step.id}
@@ -271,25 +275,33 @@ export function WorkflowEvidence({
       <div className="workflow-status-line">
         <strong>{taskWorkflowLabel(task)}</strong>
         <span>
-          {simulated ? "模拟 · " : ""}
+          {simulated ? "Simulated · " : ""}
           {testStates[workflow?.testStatus ?? "not_run"]}
         </span>
       </div>
       {phase === "revising" && (
         <p className="workflow-guidance">
-          审查发现了未满足的要求，Agent 会先修订，再重新运行测试和审查。
+          The review found unmet requirements. The Agent will revise the work,
+          then run tests and review again.
         </p>
       )}
       {phase === "blocked" && (
         <p className="workflow-guidance">
-          本轮没有完成交付。请查看未通过或无法确认的标准，再补充信息或处理后重试。
+          This run did not deliver the goal. Check failed or unverified
+          criteria, resolve the blockers, then retry.
         </p>
       )}
       <div className="acceptance-title">
-        <strong>完成标准</strong>
+        <strong>Acceptance criteria</strong>
         <span>
-          {priorReview ? "上一轮参考 · " : simulated ? "模拟结论 · " : ""}
-          {passed} / {brief.acceptanceCriteria.length} 项已确认
+          {priorReview
+            ? "Previous round · "
+            : simulated
+              ? "Simulated verdict · "
+              : ""}
+          {passed} / {brief.acceptanceCriteria.length}{" "}
+          {brief.acceptanceCriteria.length === 1 ? "criterion" : "criteria"}{" "}
+          confirmed
         </span>
       </div>
       <ul className="acceptance-list">
@@ -316,10 +328,10 @@ export function WorkflowEvidence({
                 <strong>{criterion}</strong>
                 <small>
                   {priorReview && check
-                    ? `上轮${checkStates[state]}`
+                    ? `Previous round: ${checkStates[state]}`
                     : check
                       ? checkStates[state]
-                      : "等待验收"}
+                      : "Awaiting review"}
                 </small>
                 {check?.evidence && <p>{check.evidence}</p>}
               </div>
@@ -329,7 +341,7 @@ export function WorkflowEvidence({
       </ul>
       {latest && (
         <div className="review-conclusion">
-          <strong>独立审查结论</strong>
+          <strong>Independent review</strong>
           <p>{latest.summary}</p>
           {latest.issues.length > 0 && (
             <ul>
@@ -340,7 +352,7 @@ export function WorkflowEvidence({
           )}
           {latest.reviewedTreeSha && (
             <small>
-              {simulated ? "模拟版本标记" : "被审查的代码树"}{" "}
+              {simulated ? "Simulated version marker" : "Reviewed Git tree"}{" "}
               <code>{latest.reviewedTreeSha}</code>
             </small>
           )}
@@ -348,16 +360,19 @@ export function WorkflowEvidence({
       )}
       {workflow && workflow.reviews.length > 1 && (
         <details className="review-history">
-          <summary>查看前 {workflow.reviews.length - 1} 轮审查记录</summary>
+          <summary>
+            Earlier {workflow.reviews.length === 2 ? "review" : "reviews"} (
+            {workflow.reviews.length - 1})
+          </summary>
           {workflow.reviews.slice(0, -1).map((review) => (
             <div key={review.iteration}>
               <strong>
-                第 {review.iteration} 轮 ·{" "}
+                Round {review.iteration} ·{" "}
                 {review.verdict === "pass"
-                  ? "通过"
+                  ? "Passed"
                   : review.verdict === "revise"
-                    ? "需要修订"
-                    : "阻塞"}
+                    ? "Needs revision"
+                    : "Blocked"}
               </strong>
               <p>{review.summary}</p>
               <ul>
@@ -371,8 +386,8 @@ export function WorkflowEvidence({
       )}
       <p className="workflow-method">
         {simulated
-          ? "这是固定模拟流程，用于体验验收和修订；没有调用模型或运行测试。"
-          : "实现与审查使用同一 Runner 上不同的 Codex 会话。审查会话只读；实际测试由 Runner 执行。"}
+          ? "This fixed simulation demonstrates review and revision. No model is called and no tests are run."
+          : "Implementation and review use separate Codex sessions on the same Runner. The reviewer is read-only; the Runner executes the actual tests."}
       </p>
     </section>
   );
@@ -384,20 +399,22 @@ export function followupDraft(
 ): { prompt: string; goal: GoalDraft } {
   const excerpt = (text: string, limit: number) =>
     text.length > limit
-      ? `${text.slice(0, limit)}\n[历史记录较长，已截取；完整内容请查看来源任务。]`
+      ? `${text.slice(0, limit)}\n[Historical content has been shortened. See the source task for the full record.]`
       : text;
   const context = [
-    `延续任务 ${task.id}：${excerpt(task.prompt, 1800)}`,
-    task.brief?.context ? `原有背景与决定：${task.brief.context}` : "",
-    task.result ? `上次结果：${excerpt(task.result, 2500)}` : "",
-    task.commitSha ? `上次提交：${task.commitSha}` : "",
-    task.error ? `需要解决：${excerpt(task.error, 1000)}` : "",
-    "上次任务记录仅供参考；本次必须重新验证，不继承通过结论。",
+    `Follow-up to task ${task.id}: ${excerpt(task.prompt, 1800)}`,
+    task.brief?.context
+      ? `Previous context and decisions: ${task.brief.context}`
+      : "",
+    task.result ? `Previous result: ${excerpt(task.result, 2500)}` : "",
+    task.commitSha ? `Previous commit: ${task.commitSha}` : "",
+    task.error ? `Issue to resolve: ${excerpt(task.error, 1000)}` : "",
+    "The previous task is reference material only. Verify this goal again; do not inherit its acceptance verdict.",
   ]
     .filter(Boolean)
     .join("\n\n");
   return {
-    prompt: `继续改进：${excerpt(task.prompt.split("\n")[0] ?? "", 160)}\n\n${feedback}`,
+    prompt: `Follow-up: ${excerpt(task.prompt.split("\n")[0] ?? "", 160)}\n\n${feedback}`,
     goal: {
       mode: "verified",
       context,

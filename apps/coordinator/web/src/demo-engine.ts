@@ -71,7 +71,7 @@ const savedSchema = z.object({
   snapshot: z.object({
     me: z.object({
       id: z.literal("static-demo-visitor"),
-      name: z.literal("试玩访客"),
+      name: z.literal("Demo visitor"),
       isAdmin: z.literal(false),
       createdAt: date,
     }),
@@ -232,7 +232,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
           ? snapshot.me.name
           : role === "agent"
             ? task.selectedAgentName
-            : "演示系统",
+            : "Demo system",
       role,
       content,
       createdAt: new Date(now()).toISOString(),
@@ -252,7 +252,8 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
         (candidate) => candidate.id === task.selectedAgentId,
       );
       task.status = agent?.status === "online" ? "queued" : "waiting_for_agent";
-      task.progress = "页面已恢复，未完成的模拟任务已安全重新排队。";
+      task.progress =
+        "Page restored. The interrupted simulation has been safely requeued.";
       addMessage(task, "system", task.progress);
       recovered = true;
     }
@@ -281,7 +282,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
     }
     if (task.brief?.mode === "verified" && task.workflow) {
       task.workflow = advanceSimulatedGoal(task.brief, task.workflow);
-      task.progress = `【模拟】${task.workflow.phase} · 第 ${task.workflow.iteration}/${task.workflow.maxIterations} 轮，所有证据均为预置示例。`;
+      task.progress = `[SIMULATED] ${task.workflow.phase} · round ${task.workflow.iteration}/${task.workflow.maxIterations}. All evidence is prewritten.`;
       if (
         ["reviewing", "revising", "publishing", "blocked"].includes(
           task.workflow.phase,
@@ -294,7 +295,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
       if (task.workflow.phase === "blocked") {
         task.status = "needs_attention";
         task.error =
-          "【模拟受阻】审查发现问题，已达到约定轮次上限；没有将未通过的目标标为完成。";
+          "[SIMULATED BLOCK] Review found an issue at the agreed round limit. The goal remains incomplete.";
         addMessage(task, "system", task.error);
         releaseAgent(task);
         changed();
@@ -311,15 +312,16 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
     } else if (stage < 2) {
       task.progress =
         stage === 0
-          ? "模拟 2/3 · 展示预置变更，保留任务对话与上下文。"
-          : "模拟 3/3 · 展示固定测试样例，准备可审查记录。";
+          ? "Simulation 2/3 · show prewritten changes with the task conversation and context."
+          : "Simulation 3/3 · show illustrative tests and prepare the review record.";
       addMessage(task, "agent", task.progress);
       changed();
       setTimer(() => runStage(taskId, stage + 1), stageDelay);
       return;
     }
     task.status = "completed";
-    task.progress = "模拟流程已完成 · 请审查固定示例，不代表已实现输入需求。";
+    task.progress =
+      "Simulation complete · review the fixed example; your request was not implemented.";
     Object.assign(task, staticDemoResult);
     task.error = "";
     addMessage(task, "agent", task.result);
@@ -367,8 +369,8 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
       }
       next.status = "running";
       next.progress = next.workflow
-        ? `【模拟】${next.workflow.phase} · 第 ${next.workflow.iteration}/${next.workflow.maxIterations} 轮；恢复同一执行记录。`
-        : "模拟 1/3 · 同步项目上下文，独占当前项目执行通道。";
+        ? `[SIMULATED] ${next.workflow.phase} · round ${next.workflow.iteration}/${next.workflow.maxIterations}; continuing the same run.`
+        : "Simulation 1/3 · sync project context and reserve the project execution slot.";
       next.assignedThroughMessageSequence = sequence;
       agent.status = "busy";
       agent.lastSeenAt = new Date(now()).toISOString();
@@ -381,7 +383,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
   function findAgent(value: unknown): Agent {
     const agent = snapshot.agents.find((candidate) => candidate.id === value);
     if (!agent || agent.status === "paused")
-      throw new DemoApiError("请选择一位可用的演示 Agent。", 400);
+      throw new DemoApiError("Select an available demo Agent.", 400);
     return agent;
   }
 
@@ -391,7 +393,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
       !value.trim() ||
       value.trim().length > 20_000
     )
-      throw new DemoApiError(`${label}需为 1–20,000 个字符。`, 400);
+      throw new DemoApiError(`${label} must contain 1–20,000 characters.`, 400);
     return value.trim();
   }
 
@@ -399,25 +401,32 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
     task.status = agent.status === "offline" ? "waiting_for_agent" : "queued";
     task.progress =
       task.status === "waiting_for_agent"
-        ? `${agent.displayName} 当前离线，可重新指派给在线 Agent。`
-        : "已加入模拟队列 · 同一时间只执行一项任务。";
+        ? `${agent.displayName} is offline. Reassign to an online Agent to continue.`
+        : "Added to the simulation queue · one task runs at a time.";
     task.selectedAgentId = agent.id;
     task.selectedAgentName = agent.displayName;
     task.selectedAgentOwnerName = agent.ownerName;
   }
 
   function request<T>(path: string, init?: RequestInit): T {
-    if (disposed) throw new DemoApiError("演示会话已关闭，请刷新页面。", 409);
+    if (disposed)
+      throw new DemoApiError(
+        "The demo session has closed. Refresh the page to continue.",
+        409,
+      );
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "GET" && path === "/api/snapshot")
       return structuredClone(snapshot) as T;
     if (method !== "POST")
-      throw new DemoApiError("浏览器演示不支持此操作。", 403);
+      throw new DemoApiError(
+        "This action is not available in the browser demo.",
+        403,
+      );
     const match =
       /^\/api\/tasks\/([^/]+)\/(messages|cancel|reassign|retry)$/.exec(path);
     if (path !== "/api/tasks" && !match)
       throw new DemoApiError(
-        "管理、邀请与 Agent 接入仅在真实 Coordinator 中可用。",
+        "Management, invitations and Agent pairing require a real Coordinator.",
         403,
       );
     let body: Record<string, unknown> = {};
@@ -428,20 +437,20 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
           throw new Error("invalid_body");
         body = parsed as Record<string, unknown>;
       } catch {
-        throw new DemoApiError("请求内容必须是 JSON 对象。", 400);
+        throw new DemoApiError("The request body must be a JSON object.", 400);
       }
     }
     if (path === "/api/tasks") {
       if (snapshot.tasks.length >= 100)
         throw new DemoApiError(
-          "演示最多保存 100 项任务，请重置演示后继续。",
+          "The demo stores up to 100 tasks. Reset the demo to continue.",
           409,
         );
-      const prompt = requiredText(body.prompt, "任务描述");
+      const prompt = requiredText(body.prompt, "Task description");
       const parsed = createTaskSchema.safeParse({ ...body, prompt });
       if (!parsed.success)
         throw new DemoApiError(
-          parsed.error.issues[0]?.message ?? "目标参数无效。",
+          parsed.error.issues[0]?.message ?? "The goal parameters are invalid.",
           400,
         );
       const agent = findAgent(body.agentId);
@@ -478,7 +487,7 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
       addMessage(
         task,
         "system",
-        "仅演示操作流程：你的输入会保存在此浏览器，完成后展示固定的可访问性示例；不会实现输入需求，也不会调用 Codex、Git 或测试命令。",
+        "Workflow demonstration only: your input stays in this browser and the result is a fixed accessibility example. The demo does not implement your request or call Codex, Git or test commands.",
       );
       snapshot.tasks.unshift(task);
       changed();
@@ -488,48 +497,64 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
     const task = snapshot.tasks.find(
       (candidate) => candidate.id === match?.[1],
     );
-    if (!task) throw new DemoApiError("找不到这项演示任务。", 404);
+    if (!task)
+      throw new DemoApiError("This demo task could not be found.", 404);
     const action = match?.[2];
     if (
       action !== "messages" &&
       task.requesterMemberId !== snapshot.me.id &&
       !snapshot.me.isAdmin
     )
-      throw new DemoApiError("只有任务发布者可以管理这项任务。", 403);
+      throw new DemoApiError(
+        "Only the task requester can manage this task.",
+        403,
+      );
     if (action === "messages") {
       if (task.messages.length >= 480)
-        throw new DemoApiError("此演示任务的对话已达上限。", 409);
-      const content = requiredText(body.content, "补充说明");
+        throw new DemoApiError(
+          "This demo task has reached its message limit.",
+          409,
+        );
+      const content = requiredText(body.content, "Additional context");
       const message = addMessage(task, "member", content);
       changed();
       return structuredClone(message) as T;
     }
     if (action === "cancel") {
       if (!["queued", "waiting_for_agent", "running"].includes(task.status))
-        throw new DemoApiError("这项任务已结束，无法取消。", 409);
+        throw new DemoApiError(
+          "This task has already ended and cannot be canceled.",
+          409,
+        );
       if (task.status === "running") {
         clearTimeout(timer);
         timer = undefined;
         releaseAgent(task);
       }
       task.status = "canceled";
-      task.progress = "模拟任务已取消，执行通道已释放。";
+      task.progress = "Simulation canceled. The execution slot is available.";
       addMessage(task, "system", task.progress);
     } else if (action === "reassign") {
       if (!["queued", "waiting_for_agent"].includes(task.status))
-        throw new DemoApiError("仅排队或等待 Agent 的任务可以重新指派。", 409);
+        throw new DemoApiError(
+          "Only queued tasks or tasks waiting for an Agent can be reassigned.",
+          409,
+        );
       const agent = findAgent(body.agentId);
       enqueue(task, agent);
-      addMessage(task, "system", `已重新指派给 ${agent.displayName}。`);
+      addMessage(task, "system", `Reassigned to ${agent.displayName}.`);
     } else if (action === "retry") {
       if (task.status !== "needs_attention")
-        throw new DemoApiError("仅需要处理的任务可以重新排队。", 409);
+        throw new DemoApiError(
+          "Only tasks needing attention can be retried.",
+          409,
+        );
       const agent = findAgent(task.selectedAgentId);
       if (task.workflow && task.brief) {
         addMessage(
           task,
           "system",
-          `【模拟历史证据】上一执行 ${task.runId}：${JSON.stringify({ workflow: task.workflow, result: task.result, diff: task.diff, testOutput: task.testOutput, error: task.error })}`,
+          `[SIMULATED HISTORY] Previous run ${task.runId}: ${JSON.stringify({ workflow: task.workflow, result: task.result, diff: task.diff, testOutput: task.testOutput, error: task.error })}`,
         );
         task.workflow = initialGoalWorkflow(task.brief);
         task.runId = `simulated-run-${now()}-${++sequence}`;
@@ -544,8 +569,8 @@ export function createDemoEngine(options: DemoEngineOptions = {}) {
         task,
         "system",
         task.workflow
-          ? "已按原验收约定重新排队并创建新执行记录；1 轮目标仍会停在审查未通过，2–3 轮目标将演示修订。"
-          : "已重新排队。本次模拟将演示恢复成功；完成结果仍为固定示例。",
+          ? "Requeued under the original agreement with a new run. One-round goals still stop at the failed review; two- or three-round goals demonstrate revision."
+          : "Requeued. This simulation demonstrates successful recovery; the result remains a fixed example.",
       );
     }
     changed();

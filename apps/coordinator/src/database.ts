@@ -206,7 +206,7 @@ export class CoordinatorDatabase {
         .prepare(
           `INSERT OR IGNORE INTO members
            (id, name, is_admin, session_token_hash, created_at)
-           VALUES (?, '[DEMO] 指挥官', 1, NULL, ?)`,
+           VALUES (?, '[DEMO] Project admin', 1, NULL, ?)`,
         )
         .run(memberId, stamp);
       if (!existingDemoMember)
@@ -310,8 +310,8 @@ export class CoordinatorDatabase {
           id: "demo-task-running",
           agentId: "demo-agent-aurora",
           status: hasUserActiveTask ? "completed" : "running",
-          prompt: "[DEMO] 为大厅增加任务状态提示",
-          progress: "[DEMO] 正在模拟分析组件与运行测试",
+          prompt: "[DEMO] Add task status guidance to the workspace",
+          progress: "[DEMO] Simulating component analysis and test execution",
           result: "",
           diff: "",
           tests: "",
@@ -322,9 +322,10 @@ export class CoordinatorDatabase {
           id: "demo-task-completed",
           agentId: "demo-agent-rune",
           status: "completed",
-          prompt: "[DEMO] 优化 Agent 小队卡片",
+          prompt: "[DEMO] Improve Agent cards",
           progress: "[DEMO] Completed",
-          result: "[DEMO RESULT] 小队卡片已完成视觉整理。",
+          result:
+            "[DEMO RESULT] The Agent card layout has been updated in this fixed example.",
           diff: "[DEMO DIFF — SIMULATED, NO FILES CHANGED]\n--- a/web/AgentCard.tsx\n+++ b/web/AgentCard.tsx\n@@ -1 +1 @@\n- status\n+ status and owner",
           tests:
             "[DEMO TESTS — SIMULATED]\nPASS AgentCard.demo.test.tsx (4 tests)",
@@ -335,7 +336,7 @@ export class CoordinatorDatabase {
           id: "demo-task-waiting",
           agentId: "demo-agent-echo",
           status: "waiting_for_agent",
-          prompt: "[DEMO] 为离线 Agent 保留任务",
+          prompt: "[DEMO] Queue a task for an offline Agent",
           progress: "[DEMO] Waiting for the selected Agent",
           result: "",
           diff: "",
@@ -347,13 +348,14 @@ export class CoordinatorDatabase {
           id: "demo-task-attention",
           agentId: "demo-agent-forge",
           status: "needs_attention",
-          prompt: "[DEMO] 检查发布前的视觉回归",
+          prompt: "[DEMO] Review visual changes before release",
           progress: "[DEMO] Needs attention",
           result: "",
           diff: "[DEMO DIFF — SIMULATED, NO FILES CHANGED]",
           tests: "[DEMO TESTS — SIMULATED]\n1 illustrative check needs review",
           commit: "",
-          error: "[DEMO] 示例：Agent 所有者需要确认后继续。",
+          error:
+            "[DEMO] Example: the Agent owner must review the issue before continuing.",
         },
       ] as const;
       if (existingDemoMember) return existingDemoMember;
@@ -399,7 +401,7 @@ export class CoordinatorDatabase {
           .prepare(
             `INSERT OR IGNORE INTO messages
              (id, task_id, member_id, member_name, role, content, created_at)
-             VALUES (?, ?, ?, '[DEMO] 指挥官', 'member', ?, ?)`,
+             VALUES (?, ?, ?, '[DEMO] Project admin', 'member', ?, ?)`,
           )
           .run(`message-${task.id}`, task.id, memberId, task.prompt, stamp);
       }
@@ -1033,7 +1035,7 @@ export class CoordinatorDatabase {
     return Boolean(
       this.sqlite
         .prepare(
-          "UPDATE tasks SET status='waiting_for_agent', progress='此目标需要支持 goal-workflow-v1 的新版 Runner，请升级后重连。' WHERE selected_agent_id=? AND status IN ('queued','waiting_for_agent') AND brief_json<>'' AND json_extract(brief_json, '$.mode')='verified' AND progress<>'此目标需要支持 goal-workflow-v1 的新版 Runner，请升级后重连。'",
+          "UPDATE tasks SET status='waiting_for_agent', progress='This goal requires an updated Runner with goal-workflow-v1. Upgrade and reconnect.' WHERE selected_agent_id=? AND status IN ('queued','waiting_for_agent') AND brief_json<>'' AND json_extract(brief_json, '$.mode')='verified' AND progress<>'This goal requires an updated Runner with goal-workflow-v1. Upgrade and reconnect.'",
         )
         .run(agentId).changes,
     );
@@ -1060,8 +1062,8 @@ export class CoordinatorDatabase {
         .prepare(
           `UPDATE tasks
            SET status='needs_attention',
-               progress='管理员已紧急释放任务',
-               error='离线活动任务已由管理员紧急释放，请检查 Agent 本地工作区',
+               progress='Task force-released by an administrator',
+               error='An administrator released this offline active task. Inspect the Agent workspace.',
                updated_at=?
            WHERE id=? AND selected_agent_id=?
              AND status IN ('running','waiting_for_owner')
@@ -1090,7 +1092,7 @@ export class CoordinatorDatabase {
         .run(
           messageId,
           taskId,
-          `管理员 ${administratorName} 在确认 Agent 所有者电脑上的 Runner 已停止后紧急释放了此任务；Agent 已暂停，请检查其本地工作区后再恢复。`,
+          `Administrator ${administratorName} force-released this task after confirming the Runner had stopped on the owner's computer. The Agent is paused; inspect its local workspace before resuming.`,
           stamp,
         );
       return true;
