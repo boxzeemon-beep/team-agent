@@ -10,7 +10,7 @@ English quick start: `main` contains the **goal-and-acceptance workbench**. Open
 
 ## 本地启动
 
-使用 Node.js 22.5+、pnpm 11，在当前源码目录执行：
+使用 Node.js 22.13+、pnpm 11，在当前源码目录执行：
 
 ```bash
 pnpm install --frozen-lockfile

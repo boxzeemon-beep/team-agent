@@ -10,7 +10,7 @@
 本次更新范围是源码与 Pages，不创建版本 tag，也不更新 Docker 镜像：
 `:0.2.0` 与 `:latest` 仍为原版本。新版工作台和 Runner 请运行当前 `main` 源码或自行构建。
 
-在当前源码目录使用 Node.js 22.5+ 和 pnpm 11 启动：
+在当前源码目录使用 Node.js 22.13+ 和 pnpm 11 启动：
 
 ```bash
 pnpm install --frozen-lockfile
@@ -76,7 +76,7 @@ pnpm demo:browser
 
 [![CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml)
 [![最新版本](https://img.shields.io/github/v/release/boxzeemon-beep/team-agent)](https://github.com/boxzeemon-beep/team-agent/releases/latest)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-43853d.svg)](package.json)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.13-43853d.svg)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [English](README.md) · [战术大厅体验](docs/tactical-lobby-experience.md) · [架构](docs/architecture.md) · [安全](SECURITY.md) · [路线图](ROADMAP.md) · [参与贡献](CONTRIBUTING.md)
@@ -182,7 +182,7 @@ Coordinator 主机需要 Docker Compose、所有 Agent 所有者均可写入的 
 Runner 主机还需要：
 
 - 已安装并登录 Codex CLI；
-- Node.js 22.5+ 与 npm，用于安装 Runner；
+- Node.js 22.13+ 与 npm，用于安装 Runner；
 - 对项目 Git 仓库具有拉取和推送权限；
 - 可以访问 Coordinator。
 
@@ -219,7 +219,7 @@ tailscale serve status
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
-不使用 Docker 的源码开发需要 Node.js 22.5+ 与 pnpm 11。先运行 `pnpm install --frozen-lockfile`，开发时使用 `pnpm coordinator:dev`（网页在 `http://127.0.0.1:4311`）；正式构建运行则依次执行 `pnpm build` 和 `pnpm coordinator:built`。Coordinator 默认监听 `127.0.0.1:4310`。单独执行 `pnpm coordinator` 只启动后端，若要由它提供网页，需要先完成构建。
+不使用 Docker 的源码开发需要 Node.js 22.13+ 与 pnpm 11。先运行 `pnpm install --frozen-lockfile`，开发时使用 `pnpm coordinator:dev`（网页在 `http://127.0.0.1:4311`）；正式构建运行则依次执行 `pnpm build` 和 `pnpm coordinator:built`。Coordinator 默认监听 `127.0.0.1:4310`。单独执行 `pnpm coordinator` 只启动后端，若要由它提供网页，需要先完成构建。
 
 ### 2. 配置项目
 

@@ -14,7 +14,7 @@ This update covers source and Pages. It does not create a version tag or update
 the Docker images: `:0.2.0` and `:latest` still contain the original release.
 Use current `main` source or build it yourself for the new workbench and Runner.
 
-From this source checkout, use Node.js 22.5+ and pnpm 11:
+From this source checkout, use Node.js 22.13+ and pnpm 11:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -89,7 +89,7 @@ and inspect the response, diff, tests, and commit when it finishes.
 
 [![CI](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/boxzeemon-beep/team-agent/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/boxzeemon-beep/team-agent)](https://github.com/boxzeemon-beep/team-agent/releases/latest)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-43853d.svg)](package.json)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.13-43853d.svg)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [简体中文](README.zh-CN.md) · [Tactical lobby](docs/tactical-lobby-experience.md) · [Architecture](docs/architecture.md) · [Security](SECURITY.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
@@ -203,7 +203,7 @@ Native Codex approvals remain on the Agent owner's computer. When approval is ne
 
 #### Runner host
 
-- Node.js 22.5+ and npm for the Runner installer
+- Node.js 22.13+ and npm for the Runner installer
 - Codex CLI installed and signed in
 - Git pull/push access to the project repository
 - Network access to the Coordinator
@@ -245,7 +245,7 @@ override explicitly:
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
-For source development without Docker, use Node.js 22.5+ and pnpm 11. Install with
+For source development without Docker, use Node.js 22.13+ and pnpm 11. Install with
 `pnpm install --frozen-lockfile`, then use `pnpm coordinator:dev` for the development
 server and web UI at `http://127.0.0.1:4311`. For a production build, run `pnpm build`
 followed by `pnpm coordinator:built`. The Coordinator listens on `127.0.0.1:4310`
@@ -342,7 +342,7 @@ Read the [security policy](SECURITY.md) and the detailed [security model and dep
 | Runner state | Local device token, Codex threads, managed clones, completion receipts |
 | Network exposure | Source process uses loopback by default; Compose publishes configurable port `4310` |
 | Browsers | Modern desktop browsers |
-| Runner OS | Node.js 22.5+; shell installer for macOS/Linux and PowerShell installer for Windows |
+| Runner OS | Node.js 22.13+; shell installer for macOS/Linux and PowerShell installer for Windows |
 
 ## Current scope
 
